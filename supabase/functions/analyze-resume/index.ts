@@ -34,34 +34,16 @@ serve(async (req) => {
       .eq('id', applicationId);
 
     // Prepare AI prompt for comprehensive resume analysis
-    const prompt = `Analyze the following candidate application for LSETF (Lagos State Employment Trust Fund) / PLP (Power Land Project) programs. Provide a detailed assessment.
+    const prompt = `Analyze the following candidate application for LSETF (Lagos State Employment Trust Fund) / PLP (Power Land Project) programs. Provide a detailed assessment covering skills, experience, education, and overall fit.
 
 RESUME/CV:
 ${resumeText}
 
 ${coverLetter ? `COVER LETTER:\n${coverLetter}` : ''}
 
-Please analyze this candidate and provide:
-1. Skills Score (0-100): Rate technical and soft skills relevant to employment programs
-2. Experience Score (0-100): Evaluate work experience, internships, projects
-3. Education Score (0-100): Assess educational background and certifications
-4. Overall Score (0-100): Weighted average recommendation
-5. Key Skills: List 5-8 most relevant skills with proficiency levels (beginner/intermediate/advanced/expert)
-6. Recommendations: 2-3 sentences on why this candidate is a good fit or areas for improvement
-7. Summary: Brief analysis of strengths and potential program matches
+Provide scores (0-100) for skills, experience, education, and overall fit. Identify 5-8 key skills with proficiency levels. Include recommendations and a summary of the candidate's strengths and program matches.`;
 
-Format your response as JSON with this exact structure:
-{
-  "skills_score": number,
-  "experience_score": number,
-  "education_score": number,
-  "overall_score": number,
-  "skills": [{"name": "skill name", "proficiency": "beginner|intermediate|advanced|expert"}],
-  "recommendations": "text",
-  "summary": "text"
-}`;
-
-    // Call Lovable AI Gateway
+    // Call Lovable AI Gateway with structured output
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -77,6 +59,62 @@ Format your response as JSON with this exact structure:
           },
           { role: 'user', content: prompt }
         ],
+        tools: [
+          {
+            type: 'function',
+            function: {
+              name: 'analyze_candidate',
+              description: 'Analyze a candidate and return structured assessment',
+              parameters: {
+                type: 'object',
+                properties: {
+                  skills_score: {
+                    type: 'number',
+                    description: 'Score for technical and soft skills (0-100)'
+                  },
+                  experience_score: {
+                    type: 'number',
+                    description: 'Score for work experience (0-100)'
+                  },
+                  education_score: {
+                    type: 'number',
+                    description: 'Score for educational background (0-100)'
+                  },
+                  overall_score: {
+                    type: 'number',
+                    description: 'Overall recommendation score (0-100)'
+                  },
+                  skills: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        name: { type: 'string' },
+                        proficiency: { 
+                          type: 'string',
+                          enum: ['beginner', 'intermediate', 'advanced', 'expert']
+                        }
+                      },
+                      required: ['name', 'proficiency'],
+                      additionalProperties: false
+                    }
+                  },
+                  recommendations: {
+                    type: 'string',
+                    description: '2-3 sentences on candidate fit'
+                  },
+                  summary: {
+                    type: 'string',
+                    description: 'Brief analysis of strengths and program matches'
+                  }
+                },
+                required: ['skills_score', 'experience_score', 'education_score', 'overall_score', 'skills', 'recommendations', 'summary'],
+                additionalProperties: false
+              }
+            }
+          }
+        ],
+        tool_choice: { type: 'function', function: { name: 'analyze_candidate' } }
       }),
     });
 
@@ -87,22 +125,16 @@ Format your response as JSON with this exact structure:
     }
 
     const aiData = await aiResponse.json();
-    const analysisText = aiData.choices[0].message.content;
+    console.log('AI Response:', JSON.stringify(aiData, null, 2));
     
-    console.log('AI Response:', analysisText);
-    
-    // Parse AI response
-    let analysis;
-    try {
-      // Extract JSON from potential markdown code blocks
-      const jsonMatch = analysisText.match(/```json\n?([\s\S]*?)\n?```/) || 
-                        analysisText.match(/\{[\s\S]*\}/);
-      const jsonText = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : analysisText;
-      analysis = JSON.parse(jsonText);
-    } catch (parseError) {
-      console.error('Failed to parse AI response:', parseError);
-      throw new Error('Failed to parse AI analysis');
+    // Extract structured output from tool call
+    const toolCall = aiData.choices[0].message.tool_calls?.[0];
+    if (!toolCall || !toolCall.function.arguments) {
+      console.error('No tool call in response');
+      throw new Error('Failed to get structured analysis from AI');
     }
+
+    const analysis = JSON.parse(toolCall.function.arguments);
 
     // Store AI analysis in database
     const { error: analysisError } = await supabase
@@ -116,7 +148,7 @@ Format your response as JSON with this exact structure:
         recommendations: analysis.recommendations,
         analysis_summary: {
           summary: analysis.summary,
-          raw_response: analysisText
+          raw_response: JSON.stringify(analysis)
         }
       });
 
