@@ -1,8 +1,21 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Brain, Users, TrendingUp, Database } from "lucide-react";
+import { Brain, Users, TrendingUp, Database, LogOut } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 const Header = () => {
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    toast({
+      title: "Signed out",
+      description: "You have been signed out successfully.",
+    });
+    navigate("/auth");
+  };
   const location = useLocation();
   
   const isActive = (path: string) => location.pathname === path;
@@ -48,6 +61,10 @@ const Header = () => {
             </Button>
           </Link>
         </nav>
+        <Button variant="ghost" size="sm" onClick={handleSignOut} className="gap-2">
+          <LogOut className="w-4 h-4" />
+          Sign Out
+        </Button>
       </div>
     </header>
   );
