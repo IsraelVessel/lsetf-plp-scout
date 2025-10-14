@@ -1,19 +1,24 @@
 import { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import Header from "@/components/Header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Trophy, Medal, Award, TrendingUp, Mail, Phone, Loader2, Briefcase } from "lucide-react";
+import { Trophy, Medal, Award, TrendingUp, Mail, Phone, Loader2, Briefcase, PlayCircle, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 
 const Rankings = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedRole, setSelectedRole] = useState<string>("all");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [progress, setProgress] = useState({ current: 0, total: 0 });
   
   const { data: applications, isLoading } = useQuery({
     queryKey: ['rankedApplications', selectedRole],
@@ -54,6 +59,89 @@ const Rankings = () => {
 
   // Get unique job roles for filter
   const jobRoles = [...new Set(applications?.map(app => app.job_role).filter(Boolean))] as string[];
+
+  const bulkAnalyze = async () => {
+    if (selectedIds.size === 0) {
+      toast({
+        title: "No candidates selected",
+        description: "Please select candidates to analyze",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsAnalyzing(true);
+    setProgress({ current: 0, total: selectedIds.size });
+    
+    const selectedApps = applications?.filter(app => selectedIds.has(app.id)) || [];
+    let completed = 0;
+    let errors = 0;
+
+    // Process in batches of 5 to avoid overwhelming the system
+    const batchSize = 5;
+    for (let i = 0; i < selectedApps.length; i += batchSize) {
+      const batch = selectedApps.slice(i, i + batchSize);
+      
+      await Promise.all(
+        batch.map(async (app) => {
+          try {
+            // Get resume text from storage or use empty string
+            let resumeText = "";
+            if (app.resume_url) {
+              try {
+                const response = await fetch(app.resume_url);
+                resumeText = await response.text();
+              } catch (e) {
+                console.error("Failed to fetch resume:", e);
+              }
+            }
+
+            await supabase.functions.invoke('analyze-resume', {
+              body: {
+                applicationId: app.id,
+                resumeText: resumeText || "Resume content not available",
+                coverLetter: app.cover_letter || ""
+              }
+            });
+            
+            completed++;
+          } catch (error) {
+            console.error(`Failed to analyze ${app.id}:`, error);
+            errors++;
+          } finally {
+            setProgress(prev => ({ ...prev, current: prev.current + 1 }));
+          }
+        })
+      );
+    }
+
+    setIsAnalyzing(false);
+    setSelectedIds(new Set());
+    queryClient.invalidateQueries({ queryKey: ['rankedApplications'] });
+
+    toast({
+      title: "Batch Analysis Complete",
+      description: `Successfully analyzed ${completed} candidates${errors > 0 ? `, ${errors} failed` : ''}`,
+    });
+  };
+
+  const toggleSelect = (id: string) => {
+    const newSelected = new Set(selectedIds);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedIds(newSelected);
+  };
+
+  const selectAll = () => {
+    if (selectedIds.size === applications?.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(applications?.map(app => app.id) || []));
+    }
+  };
 
   const retryAnalysis = async (applicationId: string) => {
     try {
@@ -118,22 +206,63 @@ const Rankings = () => {
                 AI-analyzed candidates ranked by overall score for LSETF & PLP programs
               </p>
             </div>
-            {jobRoles.length > 0 && (
-              <Select value={selectedRole} onValueChange={setSelectedRole}>
-                <SelectTrigger className="w-[250px]">
-                  <SelectValue placeholder="Filter by role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Roles</SelectItem>
-                  {jobRoles.map((role) => (
-                    <SelectItem key={role} value={role}>
-                      {role}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
+            <div className="flex gap-3">
+              {jobRoles.length > 0 && (
+                <Select value={selectedRole} onValueChange={setSelectedRole}>
+                  <SelectTrigger className="w-[250px]">
+                    <SelectValue placeholder="Filter by role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Roles</SelectItem>
+                    {jobRoles.map((role) => (
+                      <SelectItem key={role} value={role}>
+                        {role}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
           </div>
+
+          {applications && applications.length > 0 && (
+            <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg">
+              <Checkbox
+                checked={selectedIds.size === applications.length && applications.length > 0}
+                onCheckedChange={selectAll}
+                id="select-all"
+              />
+              <Label htmlFor="select-all" className="cursor-pointer">
+                Select All ({applications.length})
+              </Label>
+              
+              {selectedIds.size > 0 && (
+                <div className="flex-1 flex items-center justify-end gap-3">
+                  <span className="text-sm text-muted-foreground">
+                    {selectedIds.size} selected
+                  </span>
+                  <Button
+                    onClick={bulkAnalyze}
+                    disabled={isAnalyzing}
+                    size="sm"
+                    className="gap-2"
+                  >
+                    {isAnalyzing ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Analyzing {progress.current}/{progress.total}
+                      </>
+                    ) : (
+                      <>
+                        <PlayCircle className="w-4 h-4" />
+                        Analyze Selected
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {!applications || applications.length === 0 ? (
@@ -155,8 +284,15 @@ const Rankings = () => {
               return (
                 <Card key={app.id} className="transition-all duration-300 hover:shadow-[var(--shadow-elegant)]">
                   <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-4 flex-1">
+                    <div className="flex items-start gap-4">
+                      <div className="pt-1">
+                        <Checkbox
+                          checked={selectedIds.has(app.id)}
+                          onCheckedChange={() => toggleSelect(app.id)}
+                        />
+                      </div>
+                      <div className="flex items-start justify-between flex-1">
+                        <div className="flex items-center gap-4 flex-1">
                         <div className="flex items-center justify-center w-12 h-12 rounded-full bg-muted">
                           {!isAnalyzing && !isPending && getRankIcon(index) || (
                             <span className="text-lg font-bold">#{index + 1}</span>
@@ -210,6 +346,7 @@ const Rankings = () => {
                           </>
                         )}
                       </div>
+                    </div>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-6">
