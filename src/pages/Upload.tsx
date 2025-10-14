@@ -20,6 +20,7 @@ const UploadPage = () => {
     name: "",
     email: "",
     phone: "",
+    jobRole: "",
     resumeText: "",
     coverLetter: ""
   });
@@ -67,6 +68,7 @@ const UploadPage = () => {
           candidate_id: candidate.id,
           resume_url: resumeUrl,
           cover_letter: formData.coverLetter,
+          job_role: formData.jobRole,
           status: 'pending'
         })
         .select()
@@ -102,6 +104,7 @@ const UploadPage = () => {
         name: "",
         email: "",
         phone: "",
+        jobRole: "",
         resumeText: "",
         coverLetter: ""
       });
@@ -174,6 +177,20 @@ const UploadPage = () => {
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     placeholder="+234 800 000 0000"
                   />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="jobRole">Job Role / Position *</Label>
+                  <Input
+                    id="jobRole"
+                    value={formData.jobRole}
+                    onChange={(e) => setFormData({ ...formData, jobRole: e.target.value })}
+                    required
+                    placeholder="e.g., Software Developer, Digital Marketer, Data Analyst"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Specify the role the candidate is applying for
+                  </p>
                 </div>
 
                 <div className="space-y-2">

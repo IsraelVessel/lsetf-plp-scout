@@ -64,6 +64,7 @@ export type Database = {
           cover_letter: string | null
           created_at: string
           id: string
+          job_role: string | null
           resume_url: string | null
           status: string | null
           updated_at: string
@@ -73,6 +74,7 @@ export type Database = {
           cover_letter?: string | null
           created_at?: string
           id?: string
+          job_role?: string | null
           resume_url?: string | null
           status?: string | null
           updated_at?: string
@@ -82,6 +84,7 @@ export type Database = {
           cover_letter?: string | null
           created_at?: string
           id?: string
+          job_role?: string | null
           resume_url?: string | null
           status?: string | null
           updated_at?: string

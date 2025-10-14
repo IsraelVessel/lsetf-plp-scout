@@ -51,7 +51,7 @@ Provide scores (0-100) for skills, experience, education, and overall fit. Ident
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: 'google/gemini-2.5-flash-lite',
         messages: [
           { 
             role: 'system', 

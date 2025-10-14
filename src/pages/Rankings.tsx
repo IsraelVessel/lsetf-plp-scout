@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import Header from "@/components/Header";
@@ -5,17 +6,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Trophy, Medal, Award, TrendingUp, Mail, Phone, Loader2 } from "lucide-react";
+import { Trophy, Medal, Award, TrendingUp, Mail, Phone, Loader2, Briefcase } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const Rankings = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [selectedRole, setSelectedRole] = useState<string>("all");
   
   const { data: applications, isLoading } = useQuery({
-    queryKey: ['rankedApplications'],
+    queryKey: ['rankedApplications', selectedRole],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('applications')
         .select(`
           *,
@@ -25,6 +28,12 @@ const Rankings = () => {
         `)
         .in('status', ['analyzed', 'analyzing', 'pending'])
         .order('created_at', { ascending: false });
+      
+      if (selectedRole !== "all") {
+        query = query.eq('job_role', selectedRole);
+      }
+      
+      const { data, error } = await query;
       
       if (error) throw error;
 
@@ -42,6 +51,9 @@ const Rankings = () => {
       });
     }
   });
+
+  // Get unique job roles for filter
+  const jobRoles = [...new Set(applications?.map(app => app.job_role).filter(Boolean))] as string[];
 
   const retryAnalysis = async (applicationId: string) => {
     try {
@@ -96,13 +108,32 @@ const Rankings = () => {
       
       <div className="container py-12">
         <div className="mb-8">
-          <h1 className="text-4xl font-bold mb-2 flex items-center gap-3">
-            <TrendingUp className="w-10 h-10 text-primary" />
-            Candidate Rankings
-          </h1>
-          <p className="text-muted-foreground">
-            AI-analyzed candidates ranked by overall score for LSETF & PLP programs
-          </p>
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <h1 className="text-4xl font-bold mb-2 flex items-center gap-3">
+                <TrendingUp className="w-10 h-10 text-primary" />
+                Candidate Rankings
+              </h1>
+              <p className="text-muted-foreground">
+                AI-analyzed candidates ranked by overall score for LSETF & PLP programs
+              </p>
+            </div>
+            {jobRoles.length > 0 && (
+              <Select value={selectedRole} onValueChange={setSelectedRole}>
+                <SelectTrigger className="w-[250px]">
+                  <SelectValue placeholder="Filter by role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Roles</SelectItem>
+                  {jobRoles.map((role) => (
+                    <SelectItem key={role} value={role}>
+                      {role}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
         </div>
 
         {!applications || applications.length === 0 ? (
@@ -133,6 +164,14 @@ const Rankings = () => {
                         </div>
                         <div className="flex-1">
                           <CardTitle className="text-2xl mb-1">{candidate.name}</CardTitle>
+                          {app.job_role && (
+                            <div className="mb-2">
+                              <Badge variant="outline" className="gap-1">
+                                <Briefcase className="w-3 h-3" />
+                                {app.job_role}
+                              </Badge>
+                            </div>
+                          )}
                           <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
                             <span className="flex items-center gap-1">
                               <Mail className="w-4 h-4" />
