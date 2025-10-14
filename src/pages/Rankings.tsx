@@ -179,7 +179,7 @@ const Rankings = () => {
                         <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2" />
                         <p>Analysis in progress... Refresh to check status.</p>
                       </div>
-                    ) : (
+                    ) : analysis ? (
                       <>
                         {/* Score Breakdown */}
                         <div className="grid md:grid-cols-3 gap-4">
@@ -238,6 +238,10 @@ const Rankings = () => {
                           </div>
                         )}
                       </>
+                    ) : (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <p>No analysis data available yet.</p>
+                      </div>
                     )}
                   </CardContent>
                 </Card>
