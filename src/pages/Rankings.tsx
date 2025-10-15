@@ -6,11 +6,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Trophy, Medal, Award, TrendingUp, Mail, Phone, Loader2, Briefcase, PlayCircle, CheckCircle2 } from "lucide-react";
+import { Trophy, Medal, Award, TrendingUp, Mail, Phone, Loader2, Briefcase, PlayCircle, CheckCircle2, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const Rankings = () => {
   const { toast } = useToast();
@@ -19,6 +30,24 @@ const Rankings = () => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
+
+  // Check if user is admin
+  const { data: isAdmin } = useQuery({
+    queryKey: ['isAdmin'],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return false;
+      
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('role', 'admin')
+        .single();
+      
+      return !error && !!data;
+    }
+  });
   
   const { data: applications, isLoading } = useQuery({
     queryKey: ['rankedApplications', selectedRole],
@@ -164,6 +193,31 @@ const Rankings = () => {
       });
     }
   };
+
+  const deleteMutation = useMutation({
+    mutationFn: async (applicationId: string) => {
+      const { error } = await supabase
+        .from('applications')
+        .delete()
+        .eq('id', applicationId);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['rankedApplications'] });
+      toast({
+        title: "Success",
+        description: "Candidate deleted successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete candidate",
+        variant: "destructive",
+      });
+    }
+  });
 
   const getRankIcon = (index: number) => {
     if (index === 0) return <Trophy className="w-6 h-6 text-yellow-500" />;
@@ -322,9 +376,9 @@ const Rankings = () => {
                           </div>
                         </div>
                       </div>
-                      <div className="text-right">
+                      <div className="text-right flex flex-col items-end gap-2">
                         {isAnalyzing || isPending ? (
-                          <div className="flex flex-col items-end gap-2">
+                          <>
                             <Badge variant="secondary" className="gap-2">
                               <Loader2 className="w-3 h-3 animate-spin" />
                               {isAnalyzing ? 'Analyzing...' : 'Pending'}
@@ -336,14 +390,49 @@ const Rankings = () => {
                             >
                               Reset Status
                             </Button>
-                          </div>
+                          </>
                         ) : (
                           <>
+                            <Badge variant="default" className="gap-2 mb-2">
+                              <CheckCircle2 className="w-3 h-3" />
+                              AI Analyzed
+                            </Badge>
                             <div className={`text-4xl font-bold ${getScoreColor(analysis?.overall_score || 0)}`}>
                               {analysis?.overall_score || 0}
                             </div>
                             <div className="text-sm text-muted-foreground">Overall Score</div>
                           </>
+                        )}
+                        {isAdmin && (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button 
+                                size="sm" 
+                                variant="destructive"
+                                className="gap-2 mt-2"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                                Delete
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Candidate?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This will permanently delete {candidate.name} and all their application data. This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => deleteMutation.mutate(app.id)}
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         )}
                       </div>
                     </div>
