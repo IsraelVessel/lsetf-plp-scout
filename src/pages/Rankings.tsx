@@ -1,16 +1,17 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import Header from "@/components/Header";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Trophy, Medal, Award, TrendingUp, Mail, Phone, Loader2, Briefcase, PlayCircle, CheckCircle2, Trash2 } from "lucide-react";
+import { Trophy, Medal, Award, TrendingUp, Mail, Phone, Loader2, Briefcase, PlayCircle, CheckCircle2, Trash2, GitCompare, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,6 +23,9 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { CandidateComparison } from "@/components/CandidateComparison";
+import { InterviewQuestions } from "@/components/InterviewQuestions";
+import { CommentsSection } from "@/components/CommentsSection";
 
 const Rankings = () => {
   const { toast } = useToast();
@@ -30,6 +34,11 @@ const Rankings = () => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
+  const [compareMode, setCompareMode] = useState(false);
+  const [compareIds, setCompareIds] = useState<string[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [expandedQuestions, setExpandedQuestions] = useState<string | null>(null);
+  const [expandedComments, setExpandedComments] = useState<string | null>(null);
 
   // Check if user is admin
   const { data: isAdmin } = useQuery({
@@ -86,8 +95,53 @@ const Rankings = () => {
     }
   });
 
+  // Setup realtime subscriptions
+  useEffect(() => {
+    const channel = supabase
+      .channel('applications-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'applications'
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['rankedApplications'] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'ai_analysis'
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['rankedApplications'] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
+
   // Get unique job roles for filter
   const jobRoles = [...new Set(applications?.map(app => app.job_role).filter(Boolean))] as string[];
+
+  // Filter applications by search term
+  const filteredApplications = applications?.filter(app => {
+    if (!searchTerm) return true;
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      app.candidates?.name.toLowerCase().includes(searchLower) ||
+      app.candidates?.email.toLowerCase().includes(searchLower) ||
+      app.job_role?.toLowerCase().includes(searchLower) ||
+      app.skills?.some((s: any) => s.skill_name.toLowerCase().includes(searchLower))
+    );
+  });
 
   const bulkAnalyze = async () => {
     if (selectedIds.size === 0) {
@@ -165,12 +219,31 @@ const Rankings = () => {
   };
 
   const selectAll = () => {
-    if (selectedIds.size === applications?.length) {
+    if (selectedIds.size === filteredApplications?.length) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(applications?.map(app => app.id) || []));
+      setSelectedIds(new Set(filteredApplications?.map(app => app.id) || []));
     }
   };
+
+  const toggleCompare = (id: string) => {
+    setCompareIds(prev => {
+      if (prev.includes(id)) {
+        return prev.filter(i => i !== id);
+      }
+      if (prev.length >= 3) {
+        toast({
+          title: "Maximum Reached",
+          description: "You can compare up to 3 candidates at once",
+          variant: "destructive",
+        });
+        return prev;
+      }
+      return [...prev, id];
+    });
+  };
+
+  const compareData = applications?.filter(app => compareIds.includes(app.id)) as any;
 
   const retryAnalysis = async (applicationId: string) => {
     try {
@@ -257,37 +330,67 @@ const Rankings = () => {
                 Candidate Rankings
               </h1>
               <p className="text-muted-foreground">
-                AI-analyzed candidates ranked by overall score for LSETF & PLP programs
+                AI-analyzed candidates ranked by overall score with real-time updates
               </p>
             </div>
-            <div className="flex gap-3">
-              {jobRoles.length > 0 && (
-                <Select value={selectedRole} onValueChange={setSelectedRole}>
-                  <SelectTrigger className="w-[250px]">
-                    <SelectValue placeholder="Filter by role" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Roles</SelectItem>
-                    {jobRoles.map((role) => (
-                      <SelectItem key={role} value={role}>
-                        {role}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
+            <Button
+              variant={compareMode ? "default" : "outline"}
+              onClick={() => setCompareMode(!compareMode)}
+              className="gap-2"
+            >
+              <GitCompare className="h-4 w-4" />
+              {compareMode ? "Exit Compare" : "Compare Candidates"}
+            </Button>
+          </div>
+
+          <div className="flex gap-4 mb-6 items-center flex-wrap">
+            {jobRoles.length > 0 && (
+              <Select value={selectedRole} onValueChange={setSelectedRole}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Filter by role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Roles</SelectItem>
+                  {jobRoles.map((role) => (
+                    <SelectItem key={role} value={role}>
+                      {role}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search candidates, skills..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
             </div>
           </div>
 
-          {applications && applications.length > 0 && (
+          {compareMode && compareIds.length > 0 && compareData && (
+            <CandidateComparison
+              candidates={compareData}
+              onClose={() => {
+                setCompareMode(false);
+                setCompareIds([]);
+              }}
+              onRemove={(id) => setCompareIds(prev => prev.filter(i => i !== id))}
+            />
+          )}
+
+          {filteredApplications && filteredApplications.length > 0 && (
             <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg">
               <Checkbox
-                checked={selectedIds.size === applications.length && applications.length > 0}
+                checked={selectedIds.size === filteredApplications.length && filteredApplications.length > 0}
                 onCheckedChange={selectAll}
                 id="select-all"
               />
               <Label htmlFor="select-all" className="cursor-pointer">
-                Select All ({applications.length})
+                Select All ({filteredApplications.length})
               </Label>
               
               {selectedIds.size > 0 && (
@@ -319,18 +422,20 @@ const Rankings = () => {
           )}
         </div>
 
-        {!applications || applications.length === 0 ? (
+        {!filteredApplications || filteredApplications.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center">
-              <p className="text-muted-foreground">No candidates yet. Upload candidates to get started.</p>
+              <p className="text-muted-foreground">
+                {searchTerm ? "No candidates match your search" : "No candidates yet. Upload candidates to get started."}
+              </p>
             </CardContent>
           </Card>
         ) : (
           <div className="space-y-4">
-            {applications.map((app, index) => {
+            {filteredApplications.map((app, index) => {
               const analysis = app.ai_analysis?.[0];
               const candidate = app.candidates;
-              const isAnalyzing = app.status === 'analyzing';
+              const isAnalyzingStatus = app.status === 'analyzing';
               const isPending = app.status === 'pending';
               
               if (!candidate) return null;
@@ -340,15 +445,22 @@ const Rankings = () => {
                   <CardHeader>
                     <div className="flex items-start gap-4">
                       <div className="pt-1">
-                        <Checkbox
-                          checked={selectedIds.has(app.id)}
-                          onCheckedChange={() => toggleSelect(app.id)}
-                        />
+                        {compareMode ? (
+                          <Checkbox
+                            checked={compareIds.includes(app.id)}
+                            onCheckedChange={() => toggleCompare(app.id)}
+                          />
+                        ) : (
+                          <Checkbox
+                            checked={selectedIds.has(app.id)}
+                            onCheckedChange={() => toggleSelect(app.id)}
+                          />
+                        )}
                       </div>
                       <div className="flex items-start justify-between flex-1">
                         <div className="flex items-center gap-4 flex-1">
                         <div className="flex items-center justify-center w-12 h-12 rounded-full bg-muted">
-                          {!isAnalyzing && !isPending && getRankIcon(index) || (
+                          {!isAnalyzingStatus && !isPending && getRankIcon(index) || (
                             <span className="text-lg font-bold">#{index + 1}</span>
                           )}
                         </div>
@@ -377,11 +489,11 @@ const Rankings = () => {
                         </div>
                       </div>
                       <div className="text-right flex flex-col items-end gap-2">
-                        {isAnalyzing || isPending ? (
+                        {isAnalyzingStatus || isPending ? (
                           <>
                             <Badge variant="secondary" className="gap-2">
                               <Loader2 className="w-3 h-3 animate-spin" />
-                              {isAnalyzing ? 'Analyzing...' : 'Pending'}
+                              {isAnalyzingStatus ? 'Analyzing...' : 'Pending'}
                             </Badge>
                             <Button 
                               size="sm" 
@@ -439,10 +551,10 @@ const Rankings = () => {
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-6">
-                    {isAnalyzing || isPending ? (
+                    {isAnalyzingStatus || isPending ? (
                       <div className="text-center py-8 text-muted-foreground">
                         <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2" />
-                        <p>Analysis in progress... Refresh to check status.</p>
+                        <p>Analysis in progress... Updates in real-time.</p>
                       </div>
                     ) : analysis ? (
                       <>
@@ -474,11 +586,11 @@ const Rankings = () => {
                         {/* Skills */}
                         {app.skills && app.skills.length > 0 && (
                           <div>
-                            <h4 className="font-semibold mb-2">Key Skills</h4>
+                            <h4 className="text-sm font-semibold mb-2">Skills</h4>
                             <div className="flex flex-wrap gap-2">
-                              {app.skills.map((skill) => (
-                                <Badge key={skill.id} variant="secondary">
-                                  {skill.skill_name} - {skill.proficiency_level}
+                              {app.skills.map((skill: any, idx: number) => (
+                                <Badge key={idx} variant="secondary">
+                                  {skill.skill_name} • {skill.proficiency_level}
                                 </Badge>
                               ))}
                             </div>
@@ -486,28 +598,49 @@ const Rankings = () => {
                         )}
 
                         {/* Recommendations */}
-                        <div>
-                          <h4 className="font-semibold mb-2">AI Recommendations</h4>
-                          <p className="text-sm text-muted-foreground leading-relaxed">
-                            {analysis.recommendations}
-                          </p>
-                        </div>
-
-                        {/* Summary */}
-                        {analysis.analysis_summary?.summary && (
+                        {analysis.recommendations && (
                           <div>
-                            <h4 className="font-semibold mb-2">Summary</h4>
-                            <p className="text-sm text-muted-foreground leading-relaxed">
-                              {analysis.analysis_summary.summary}
-                            </p>
+                            <h4 className="text-sm font-semibold mb-2">Recommendations</h4>
+                            <p className="text-sm text-muted-foreground">{analysis.recommendations}</p>
                           </div>
                         )}
+
+                        {/* Interview Questions & Comments */}
+                        <div className="grid md:grid-cols-2 gap-4 pt-4 border-t">
+                          <div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="w-full mb-3"
+                              onClick={() => setExpandedQuestions(
+                                expandedQuestions === app.id ? null : app.id
+                              )}
+                            >
+                              {expandedQuestions === app.id ? "Hide" : "Show"} AI Interview Questions
+                            </Button>
+                            {expandedQuestions === app.id && (
+                              <InterviewQuestions applicationId={app.id} />
+                            )}
+                          </div>
+
+                          <div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="w-full mb-3"
+                              onClick={() => setExpandedComments(
+                                expandedComments === app.id ? null : app.id
+                              )}
+                            >
+                              {expandedComments === app.id ? "Hide" : "Show"} Team Comments
+                            </Button>
+                            {expandedComments === app.id && (
+                              <CommentsSection applicationId={app.id} />
+                            )}
+                          </div>
+                        </div>
                       </>
-                    ) : (
-                      <div className="text-center py-8 text-muted-foreground">
-                        <p>No analysis data available yet.</p>
-                      </div>
-                    )}
+                    ) : null}
                   </CardContent>
                 </Card>
               );

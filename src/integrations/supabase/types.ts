@@ -126,6 +126,70 @@ export type Database = {
         }
         Relationships: []
       }
+      comments: {
+        Row: {
+          application_id: string
+          content: string
+          created_at: string
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          application_id: string
+          content: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          application_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comments_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      interview_questions: {
+        Row: {
+          application_id: string
+          created_at: string
+          id: string
+          questions: Json
+        }
+        Insert: {
+          application_id: string
+          created_at?: string
+          id?: string
+          questions: Json
+        }
+        Update: {
+          application_id?: string
+          created_at?: string
+          id?: string
+          questions?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "interview_questions_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string | null
