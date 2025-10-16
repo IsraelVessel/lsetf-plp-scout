@@ -12,8 +12,12 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  let applicationId: string | undefined;
+  
   try {
-    const { applicationId, resumeText, coverLetter } = await req.json();
+    const body = await req.json();
+    applicationId = body.applicationId;
+    const { resumeText, coverLetter } = body;
     
     console.log('Analyzing application:', applicationId);
     
@@ -134,12 +138,37 @@ Provide scores (0-100) for skills, experience, education, and overall fit. Ident
       throw new Error('Failed to get structured analysis from AI');
     }
 
-    const analysis = JSON.parse(toolCall.function.arguments);
+    // Parse the arguments - handle potential malformed JSON
+    let analysis;
+    try {
+      const argsString = toolCall.function.arguments.trim();
+      // Try to extract just the first JSON object if multiple are concatenated
+      const firstBraceIndex = argsString.indexOf('{');
+      let braceCount = 0;
+      let endIndex = firstBraceIndex;
+      
+      for (let i = firstBraceIndex; i < argsString.length; i++) {
+        if (argsString[i] === '{') braceCount++;
+        if (argsString[i] === '}') braceCount--;
+        if (braceCount === 0) {
+          endIndex = i + 1;
+          break;
+        }
+      }
+      
+      const singleJsonString = argsString.substring(firstBraceIndex, endIndex);
+      analysis = JSON.parse(singleJsonString);
+      console.log('Parsed analysis:', JSON.stringify(analysis, null, 2));
+    } catch (parseError) {
+      console.error('JSON Parse Error:', parseError);
+      console.error('Raw arguments:', toolCall.function.arguments);
+      throw new Error('Failed to parse AI analysis response');
+    }
 
-    // Store AI analysis in database
+    // Store AI analysis in database using upsert to handle duplicates
     const { error: analysisError } = await supabase
       .from('ai_analysis')
-      .insert({
+      .upsert({
         application_id: applicationId,
         skills_score: analysis.skills_score,
         experience_score: analysis.experience_score,
@@ -150,12 +179,20 @@ Provide scores (0-100) for skills, experience, education, and overall fit. Ident
           summary: analysis.summary,
           raw_response: JSON.stringify(analysis)
         }
+      }, {
+        onConflict: 'application_id'
       });
 
     if (analysisError) {
       console.error('Error storing analysis:', analysisError);
       throw analysisError;
     }
+
+    // Delete existing skills for this application before inserting new ones
+    await supabase
+      .from('skills')
+      .delete()
+      .eq('application_id', applicationId);
 
     // Store identified skills
     if (analysis.skills && analysis.skills.length > 0) {
@@ -198,6 +235,23 @@ Provide scores (0-100) for skills, experience, education, and overall fit. Ident
 
   } catch (error) {
     console.error('Error in analyze-resume function:', error);
+    
+    // Update application status to pending on error
+    if (applicationId) {
+      try {
+        const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+        const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+        const supabase = createClient(supabaseUrl, supabaseKey);
+        
+        await supabase
+          .from('applications')
+          .update({ status: 'pending' })
+          .eq('id', applicationId);
+      } catch (updateError) {
+        console.error('Failed to update status on error:', updateError);
+      }
+    }
+    
     return new Response(
       JSON.stringify({ 
         error: error instanceof Error ? error.message : 'Unknown error occurred',
