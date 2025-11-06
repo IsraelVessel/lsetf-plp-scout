@@ -72,8 +72,7 @@ const Dashboard = () => {
               AI-Powered Candidate Selection
             </h1>
             <p className="text-xl text-muted-foreground">
-              Intelligent analysis for LSETF & PLP programs. Upload resumes, get instant AI rankings, 
-              and identify top talent with advanced machine learning.
+              Intelligent analysis for candidate selection. Upload resumes, get instant AI rankings, and identify top talents.
             </p>
             <div className="flex gap-4 justify-center pt-4">
               <Link to="/upload">
@@ -183,9 +182,9 @@ const Dashboard = () => {
           <Card>
             <CardHeader>
               <TrendingUp className="w-12 h-12 text-secondary mb-4" />
-              <CardTitle>LMS Integration</CardTitle>
+              <CardTitle>Program Integration</CardTitle>
               <CardDescription>
-                Seamlessly connect with LSETF's upskilling platform for program matching
+                Seamlessly connect with Venia's upskilling platform for program matching
               </CardDescription>
             </CardHeader>
           </Card>

@@ -38,7 +38,7 @@ serve(async (req) => {
       .eq('id', applicationId);
 
     // Prepare AI prompt for comprehensive resume analysis
-    const prompt = `Analyze the following candidate application for LSETF (Lagos State Employment Trust Fund) / PLP (Power Land Project) programs. Provide a detailed assessment covering skills, experience, education, and overall fit.
+    const prompt = `Analyze the following candidate application for Venia programs. Provide a detailed assessment covering skills, experience, education, and overall fit.
 
 RESUME/CV:
 ${resumeText}
