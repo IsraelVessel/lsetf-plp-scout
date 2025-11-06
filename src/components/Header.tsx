@@ -28,7 +28,7 @@ const Header = () => {
             <Brain className="w-6 h-6 text-white" />
           </div>
           <span className="font-bold text-xl bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary">
-            LSETF AI Recruit
+            Venia
           </span>
         </Link>
         

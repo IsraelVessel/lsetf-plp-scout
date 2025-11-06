@@ -90,7 +90,7 @@ const Auth = () => {
           <div className="flex justify-center mb-4">
             <Shield className="w-12 h-12 text-primary" />
           </div>
-          <CardTitle className="text-3xl">LSETF ATS</CardTitle>
+          <CardTitle className="text-3xl">Venia</CardTitle>
           <CardDescription>
             Staff Authentication Portal
           </CardDescription>
@@ -112,7 +112,7 @@ const Auth = () => {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
-                    placeholder="staff@lsetf.ng"
+                    placeholder="staff@venia.com"
                   />
                 </div>
                 <div className="space-y-2">
@@ -160,7 +160,7 @@ const Auth = () => {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
-                    placeholder="staff@lsetf.ng"
+                    placeholder="staff@venia.com"
                   />
                 </div>
                 <div className="space-y-2">
