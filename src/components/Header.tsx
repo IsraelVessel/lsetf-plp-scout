@@ -1,8 +1,9 @@
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Brain, Users, TrendingUp, Database, LogOut } from "lucide-react";
+import { Users, TrendingUp, Database, LogOut } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import veniaLogo from "@/assets/venia-logo.png";
 
 const Header = () => {
   const navigate = useNavigate();
@@ -24,9 +25,7 @@ const Header = () => {
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center">
         <Link to="/" className="flex items-center space-x-2 mr-8">
-          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
-            <Brain className="w-6 h-6 text-white" />
-          </div>
+          <img src={veniaLogo} alt="Venia Logo" className="w-10 h-10 rounded-lg" />
           <span className="font-bold text-xl bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary">
             Venia
           </span>
