@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import Header from "@/components/Header";
@@ -137,10 +137,10 @@ const UploadPage = () => {
             <CardHeader>
               <CardTitle className="text-3xl flex items-center gap-2">
                 <Upload className="w-8 h-8 text-primary" />
-                Upload Candidate
+                Single Candidate Upload
               </CardTitle>
               <CardDescription>
-                Submit candidate information for AI-powered analysis and ranking
+                Submit individual candidate information for detailed AI-powered analysis. For multiple candidates, use <Link to="/batch-upload" className="underline text-primary">Batch Upload</Link>.
               </CardDescription>
             </CardHeader>
             <CardContent>

@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Dashboard from "./pages/Dashboard";
 import Upload from "./pages/Upload";
+import BatchUpload from "./pages/BatchUpload";
 import Rankings from "./pages/Rankings";
 import Auth from "./pages/Auth";
 import AdminSetup from "./pages/AdminSetup";
@@ -24,6 +25,7 @@ const App = () => (
           <Route path="/admin-setup" element={<ProtectedRoute><AdminSetup /></ProtectedRoute>} />
           <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/upload" element={<ProtectedRoute><Upload /></ProtectedRoute>} />
+          <Route path="/batch-upload" element={<ProtectedRoute><BatchUpload /></ProtectedRoute>} />
           <Route path="/rankings" element={<ProtectedRoute><Rankings /></ProtectedRoute>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

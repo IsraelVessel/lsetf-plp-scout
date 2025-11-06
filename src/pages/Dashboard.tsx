@@ -72,13 +72,19 @@ const Dashboard = () => {
               AI-Powered Candidate Selection
             </h1>
             <p className="text-xl text-muted-foreground">
-              Intelligent analysis for candidate selection. Upload resumes, get instant AI rankings, and identify top talents.
+              Intelligent analysis for candidate selection. Upload multiple resumes at once, get instant detailed AI rankings capturing every detail from CVs, and identify top talents.
             </p>
             <div className="flex gap-4 justify-center pt-4">
-              <Link to="/upload">
+              <Link to="/batch-upload">
                 <Button size="lg" className="gap-2">
                   <Users className="w-5 h-5" />
-                  Upload Candidates
+                  Batch Upload
+                </Button>
+              </Link>
+              <Link to="/upload">
+                <Button size="lg" variant="outline" className="gap-2">
+                  <Users className="w-5 h-5" />
+                  Single Upload
                 </Button>
               </Link>
               <Link to="/rankings">

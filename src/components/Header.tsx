@@ -1,6 +1,6 @@
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Users, TrendingUp, Database, LogOut } from "lucide-react";
+import { Users, TrendingUp, Database, LogOut, FolderUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import veniaLogo from "@/assets/venia-logo.png";
@@ -47,7 +47,16 @@ const Header = () => {
               className="gap-2"
             >
               <Users className="w-4 h-4" />
-              Upload Candidates
+              Single Upload
+            </Button>
+          </Link>
+          <Link to="/batch-upload">
+            <Button 
+              variant={isActive("/batch-upload") ? "default" : "ghost"}
+              className="gap-2"
+            >
+              <FolderUp className="w-4 h-4" />
+              Batch Upload
             </Button>
           </Link>
           <Link to="/rankings">

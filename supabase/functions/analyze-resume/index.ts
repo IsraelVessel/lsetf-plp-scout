@@ -38,14 +38,39 @@ serve(async (req) => {
       .eq('id', applicationId);
 
     // Prepare AI prompt for comprehensive resume analysis
-    const prompt = `Analyze the following candidate application for Venia programs. Provide a detailed assessment covering skills, experience, education, and overall fit.
+    const prompt = `You are analyzing a candidate application for Venia recruitment programs. Conduct a THOROUGH and DETAILED analysis of EVERY section of their CV/resume.
 
 RESUME/CV:
 ${resumeText}
 
 ${coverLetter ? `COVER LETTER:\n${coverLetter}` : ''}
 
-Provide scores (0-100) for skills, experience, education, and overall fit. Identify 5-8 key skills with proficiency levels. Include recommendations and a summary of the candidate's strengths and program matches.`;
+ANALYSIS REQUIREMENTS:
+
+1. SKILLS ASSESSMENT (0-100):
+   - Evaluate ALL technical skills mentioned
+   - Assess soft skills and competencies
+   - Consider skill relevance and proficiency level
+   - Extract EVERY skill mentioned (aim for 8-15 skills)
+
+2. EXPERIENCE EVALUATION (0-100):
+   - Analyze ALL work experiences listed
+   - Consider duration, responsibilities, and achievements
+   - Evaluate career progression and relevance
+   - Note specific accomplishments and metrics
+
+3. EDUCATION REVIEW (0-100):
+   - Examine ALL educational qualifications
+   - Consider certifications, courses, and training
+   - Evaluate relevance to applied position
+   - Note academic achievements and honors
+
+4. OVERALL FIT (0-100):
+   - Holistic assessment combining all factors
+   - Consider cultural fit and potential
+   - Evaluate alignment with job requirements
+
+Provide a comprehensive analysis that captures EVERY detail from the resume. Be thorough and precise.`;
 
     // Call Lovable AI Gateway with structured output
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
@@ -55,7 +80,7 @@ Provide scores (0-100) for skills, experience, education, and overall fit. Ident
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash-lite',
+        model: 'google/gemini-2.5-flash',
         messages: [
           { 
             role: 'system', 
@@ -103,16 +128,24 @@ Provide scores (0-100) for skills, experience, education, and overall fit. Ident
                       additionalProperties: false
                     }
                   },
-                  recommendations: {
+                   recommendations: {
                     type: 'string',
-                    description: '2-3 sentences on candidate fit'
+                    description: 'Detailed recommendations (3-5 sentences) covering fit, strengths, and development areas'
                   },
                   summary: {
                     type: 'string',
-                    description: 'Brief analysis of strengths and program matches'
+                    description: 'Comprehensive summary (4-6 sentences) analyzing experience, education, key strengths, and overall candidate potential'
+                  },
+                  experience_details: {
+                    type: 'string',
+                    description: 'Detailed breakdown of work experience, noting key roles, achievements, and years of experience'
+                  },
+                  education_details: {
+                    type: 'string',
+                    description: 'Detailed summary of educational background, certifications, and relevant training'
                   }
                 },
-                required: ['skills_score', 'experience_score', 'education_score', 'overall_score', 'skills', 'recommendations', 'summary'],
+                required: ['skills_score', 'experience_score', 'education_score', 'overall_score', 'skills', 'recommendations', 'summary', 'experience_details', 'education_details'],
                 additionalProperties: false
               }
             }
@@ -177,6 +210,8 @@ Provide scores (0-100) for skills, experience, education, and overall fit. Ident
         recommendations: analysis.recommendations,
         analysis_summary: {
           summary: analysis.summary,
+          experience_details: analysis.experience_details,
+          education_details: analysis.education_details,
           raw_response: JSON.stringify(analysis)
         }
       }, {
