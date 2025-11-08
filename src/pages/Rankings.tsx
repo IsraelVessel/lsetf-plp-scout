@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Trophy, Medal, Award, TrendingUp, Mail, Phone, Loader2, Briefcase, PlayCircle, CheckCircle2, Trash2, GitCompare, Search } from "lucide-react";
+import { Trophy, Medal, Award, TrendingUp, Mail, Phone, Loader2, Briefcase, PlayCircle, CheckCircle2, Trash2, GitCompare, Search, FileText, Download, ExternalLink } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -39,6 +39,7 @@ const Rankings = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [expandedQuestions, setExpandedQuestions] = useState<string | null>(null);
   const [expandedComments, setExpandedComments] = useState<string | null>(null);
+  const [viewingResume, setViewingResume] = useState<{ url: string; name: string } | null>(null);
 
   // Check if user is admin
   const { data: isAdmin } = useQuery({
@@ -558,28 +559,52 @@ const Rankings = () => {
                       </div>
                     ) : analysis ? (
                       <>
+                        {/* Resume/CV Access */}
+                        {app.resume_url && (
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-2"
+                              onClick={() => setViewingResume({ url: app.resume_url!, name: candidate.name })}
+                            >
+                              <FileText className="w-4 h-4" />
+                              View Resume/CV
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-2"
+                              onClick={() => window.open(app.resume_url, '_blank')}
+                            >
+                              <Download className="w-4 h-4" />
+                              Download
+                            </Button>
+                          </div>
+                        )}
+
                         {/* Score Breakdown */}
                         <div className="grid md:grid-cols-3 gap-4">
                           <div className="space-y-2">
                             <div className="flex justify-between text-sm">
                               <span>Skills</span>
-                              <span className="font-semibold">{analysis.skills_score}%</span>
+                              <span className="font-semibold">{analysis.skills_score || 0}/100</span>
                             </div>
-                            <Progress value={analysis.skills_score} className="h-2" />
+                            <Progress value={analysis.skills_score || 0} className="h-2" />
                           </div>
                           <div className="space-y-2">
                             <div className="flex justify-between text-sm">
                               <span>Experience</span>
-                              <span className="font-semibold">{analysis.experience_score}%</span>
+                              <span className="font-semibold">{analysis.experience_score || 0}/100</span>
                             </div>
-                            <Progress value={analysis.experience_score} className="h-2" />
+                            <Progress value={analysis.experience_score || 0} className="h-2" />
                           </div>
                           <div className="space-y-2">
                             <div className="flex justify-between text-sm">
                               <span>Education</span>
-                              <span className="font-semibold">{analysis.education_score}%</span>
+                              <span className="font-semibold">{analysis.education_score || 0}/100</span>
                             </div>
-                            <Progress value={analysis.education_score} className="h-2" />
+                            <Progress value={analysis.education_score || 0} className="h-2" />
                           </div>
                         </div>
 
@@ -646,6 +671,41 @@ const Rankings = () => {
               );
             })}
           </div>
+        )}
+
+        {/* Resume Viewer Dialog */}
+        {viewingResume && (
+          <AlertDialog open={!!viewingResume} onOpenChange={() => setViewingResume(null)}>
+            <AlertDialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+              <AlertDialogHeader>
+                <AlertDialogTitle className="flex items-center gap-2">
+                  <FileText className="w-5 h-5" />
+                  Resume/CV - {viewingResume.name}
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  Viewing candidate's resume document
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <div className="flex-1 overflow-auto">
+                <iframe
+                  src={viewingResume.url}
+                  className="w-full h-[60vh] border rounded"
+                  title={`Resume - ${viewingResume.name}`}
+                />
+              </div>
+              <AlertDialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => window.open(viewingResume.url, '_blank')}
+                  className="gap-2"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  Open in New Tab
+                </Button>
+                <AlertDialogCancel>Close</AlertDialogCancel>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         )}
       </div>
     </div>
