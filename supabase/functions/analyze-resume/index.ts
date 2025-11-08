@@ -254,6 +254,50 @@ Provide a comprehensive analysis that captures EVERY detail from the resume. Be 
 
     console.log('Analysis completed successfully');
 
+    // Fetch candidate details for email notification
+    const { data: application } = await supabase
+      .from('applications')
+      .select('*, candidates(*)')
+      .eq('id', applicationId)
+      .single();
+
+    // Send email notification to candidate
+    if (application?.candidates) {
+      try {
+        console.log('Sending email notification to candidate...');
+        
+        const notificationResponse = await fetch(
+          `${Deno.env.get('SUPABASE_URL')}/functions/v1/send-candidate-notification`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`,
+            },
+            body: JSON.stringify({
+              candidateName: application.candidates.name,
+              candidateEmail: application.candidates.email,
+              overallScore: analysis.overall_score,
+              skillsScore: analysis.skills_score,
+              experienceScore: analysis.experience_score,
+              educationScore: analysis.education_score,
+              recommendations: analysis.recommendations || 'Continue building your skills and experience.',
+              jobRole: application.job_role
+            })
+          }
+        );
+
+        if (!notificationResponse.ok) {
+          console.error('Failed to send email notification:', await notificationResponse.text());
+        } else {
+          console.log('Email notification sent successfully');
+        }
+      } catch (emailError) {
+        console.error('Error sending email notification:', emailError);
+        // Don't fail the whole function if email fails
+      }
+    }
+
     return new Response(
       JSON.stringify({ 
         success: true, 

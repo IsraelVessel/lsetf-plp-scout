@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.generate-interview-questions]
 verify_jwt = false
+
+[functions.send-candidate-notification]
+verify_jwt = false
