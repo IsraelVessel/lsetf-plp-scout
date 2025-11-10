@@ -6,12 +6,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Trophy, Medal, Award, TrendingUp, Mail, Phone, Loader2, Briefcase, PlayCircle, CheckCircle2, Trash2, GitCompare, Search, FileText, Download, ExternalLink } from "lucide-react";
+import { Trophy, Medal, Award, TrendingUp, Mail, Phone, Loader2, Briefcase, PlayCircle, CheckCircle2, Trash2, GitCompare, Search, FileText, Download, ExternalLink, Filter } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Slider } from "@/components/ui/slider";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,6 +46,13 @@ const Rankings = () => {
   const [expandedQuestions, setExpandedQuestions] = useState<string | null>(null);
   const [expandedComments, setExpandedComments] = useState<string | null>(null);
   const [viewingResume, setViewingResume] = useState<{ url: string; name: string } | null>(null);
+  
+  // Advanced filters
+  const [scoreRange, setScoreRange] = useState<[number, number]>([0, 100]);
+  const [skillFilter, setSkillFilter] = useState<string>("");
+  const [experienceFilter, setExperienceFilter] = useState<string>("");
+  const [educationFilter, setEducationFilter] = useState<string>("");
+  const [showFilters, setShowFilters] = useState(false);
 
   // Check if user is admin
   const { data: isAdmin } = useQuery({
@@ -132,16 +145,55 @@ const Rankings = () => {
   // Get unique job roles for filter
   const jobRoles = [...new Set(applications?.map(app => app.job_role).filter(Boolean))] as string[];
 
-  // Filter applications by search term
+  // Filter applications by search term and advanced filters
   const filteredApplications = applications?.filter(app => {
-    if (!searchTerm) return true;
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      app.candidates?.name.toLowerCase().includes(searchLower) ||
-      app.candidates?.email.toLowerCase().includes(searchLower) ||
-      app.job_role?.toLowerCase().includes(searchLower) ||
-      app.skills?.some((s: any) => s.skill_name.toLowerCase().includes(searchLower))
-    );
+    // Search filter
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase();
+      const matchesSearch = 
+        app.candidates?.name.toLowerCase().includes(searchLower) ||
+        app.candidates?.email.toLowerCase().includes(searchLower) ||
+        app.job_role?.toLowerCase().includes(searchLower) ||
+        app.skills?.some((s: any) => s.skill_name.toLowerCase().includes(searchLower));
+      if (!matchesSearch) return false;
+    }
+
+    const analysis = app.ai_analysis?.[0];
+    
+    // Score range filter
+    if (analysis?.overall_score) {
+      if (analysis.overall_score < scoreRange[0] || analysis.overall_score > scoreRange[1]) {
+        return false;
+      }
+    }
+
+    // Skill filter
+    if (skillFilter) {
+      const hasSkill = app.skills?.some((s: any) => 
+        s.skill_name.toLowerCase().includes(skillFilter.toLowerCase())
+      );
+      if (!hasSkill) return false;
+    }
+
+    // Experience filter
+    if (experienceFilter) {
+      if (!analysis?.experience_score) return false;
+      const expScore = analysis.experience_score;
+      if (experienceFilter === "entry" && expScore > 40) return false;
+      if (experienceFilter === "mid" && (expScore <= 40 || expScore > 70)) return false;
+      if (experienceFilter === "senior" && expScore <= 70) return false;
+    }
+
+    // Education filter
+    if (educationFilter) {
+      if (!analysis?.education_score) return false;
+      const eduScore = analysis.education_score;
+      if (educationFilter === "basic" && eduScore > 40) return false;
+      if (educationFilter === "intermediate" && (eduScore <= 40 || eduScore > 70)) return false;
+      if (educationFilter === "advanced" && eduScore <= 70) return false;
+    }
+
+    return true;
   });
 
   const bulkAnalyze = async () => {
@@ -246,6 +298,66 @@ const Rankings = () => {
 
   const compareData = applications?.filter(app => compareIds.includes(app.id)) as any;
 
+  const exportToCSV = () => {
+    if (!filteredApplications || filteredApplications.length === 0) {
+      toast({
+        title: "No data to export",
+        description: "No candidates match your filters",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const headers = ["Name", "Email", "Phone", "Job Role", "Overall Score", "Skills Score", "Experience Score", "Education Score", "Skills", "Recommendations", "Status"];
+    
+    const rows = filteredApplications.map(app => {
+      const candidate = app.candidates;
+      const analysis = app.ai_analysis?.[0];
+      const skills = app.skills?.map((s: any) => `${s.skill_name} (${s.proficiency_level})`).join("; ") || "";
+      
+      return [
+        candidate?.name || "",
+        candidate?.email || "",
+        candidate?.phone || "",
+        app.job_role || "",
+        analysis?.overall_score || 0,
+        analysis?.skills_score || 0,
+        analysis?.experience_score || 0,
+        analysis?.education_score || 0,
+        skills,
+        (analysis?.recommendations || "").replace(/"/g, '""'),
+        app.status
+      ];
+    });
+
+    const csvContent = [
+      headers.join(","),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(","))
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `candidates_export_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    toast({
+      title: "Export Successful",
+      description: `Exported ${filteredApplications.length} candidates to CSV`,
+    });
+  };
+
+  const clearFilters = () => {
+    setScoreRange([0, 100]);
+    setSkillFilter("");
+    setExperienceFilter("");
+    setEducationFilter("");
+  };
+
   const retryAnalysis = async (applicationId: string) => {
     try {
       await supabase
@@ -334,14 +446,24 @@ const Rankings = () => {
                 AI-analyzed candidates ranked by overall score with real-time updates
               </p>
             </div>
-            <Button
-              variant={compareMode ? "default" : "outline"}
-              onClick={() => setCompareMode(!compareMode)}
-              className="gap-2"
-            >
-              <GitCompare className="h-4 w-4" />
-              {compareMode ? "Exit Compare" : "Compare Candidates"}
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={exportToCSV}
+                className="gap-2"
+              >
+                <Download className="h-4 w-4" />
+                Export CSV
+              </Button>
+              <Button
+                variant={compareMode ? "default" : "outline"}
+                onClick={() => setCompareMode(!compareMode)}
+                className="gap-2"
+              >
+                <GitCompare className="h-4 w-4" />
+                {compareMode ? "Exit Compare" : "Compare Candidates"}
+              </Button>
+            </div>
           </div>
 
           <div className="flex gap-4 mb-6 items-center flex-wrap">
@@ -370,6 +492,79 @@ const Rankings = () => {
                 className="pl-10"
               />
             </div>
+
+            <Popover open={showFilters} onOpenChange={setShowFilters}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="gap-2">
+                  <Filter className="h-4 w-4" />
+                  Advanced Filters
+                  {(scoreRange[0] > 0 || scoreRange[1] < 100 || skillFilter || experienceFilter || educationFilter) && (
+                    <Badge variant="secondary" className="ml-1 px-1.5 py-0">!</Badge>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80" align="end">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-semibold">Advanced Filters</h4>
+                    <Button variant="ghost" size="sm" onClick={clearFilters}>
+                      Clear All
+                    </Button>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Score Range: {scoreRange[0]} - {scoreRange[1]}</Label>
+                    <Slider
+                      value={scoreRange}
+                      onValueChange={(value) => setScoreRange(value as [number, number])}
+                      min={0}
+                      max={100}
+                      step={5}
+                      className="w-full"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Skill</Label>
+                    <Input
+                      placeholder="e.g., JavaScript, Python"
+                      value={skillFilter}
+                      onChange={(e) => setSkillFilter(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Experience Level</Label>
+                    <Select value={experienceFilter} onValueChange={setExperienceFilter}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="All levels" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">All levels</SelectItem>
+                        <SelectItem value="entry">Entry (0-40)</SelectItem>
+                        <SelectItem value="mid">Mid (41-70)</SelectItem>
+                        <SelectItem value="senior">Senior (71+)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Education Level</Label>
+                    <Select value={educationFilter} onValueChange={setEducationFilter}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="All levels" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">All levels</SelectItem>
+                        <SelectItem value="basic">Basic (0-40)</SelectItem>
+                        <SelectItem value="intermediate">Intermediate (41-70)</SelectItem>
+                        <SelectItem value="advanced">Advanced (71+)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
 
           {compareMode && compareIds.length > 0 && compareData && (
