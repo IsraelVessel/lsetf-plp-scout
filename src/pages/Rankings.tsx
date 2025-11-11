@@ -382,13 +382,30 @@ const Rankings = () => {
   };
 
   const updateStatusMutation = useMutation({
-    mutationFn: async ({ applicationId, newStatus }: { applicationId: string; newStatus: string }) => {
+    mutationFn: async ({ applicationId, newStatus, oldStatus }: { applicationId: string; newStatus: string; oldStatus: string }) => {
       const { error } = await supabase
         .from('applications')
         .update({ status: newStatus })
         .eq('id', applicationId);
       
       if (error) throw error;
+
+      // Trigger notification for key stages
+      const keyStages = ["interview", "offer", "hired"];
+      if (keyStages.includes(newStatus)) {
+        try {
+          await supabase.functions.invoke('notify-status-change', {
+            body: {
+              applicationId,
+              oldStatus,
+              newStatus,
+            }
+          });
+        } catch (notifError) {
+          console.error("Failed to send notification:", notifError);
+          // Don't fail the status update if notification fails
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['rankedApplications'] });
@@ -741,6 +758,7 @@ const Rankings = () => {
                                updateStatusMutation.mutate({
                                  applicationId: app.id,
                                  newStatus,
+                                 oldStatus: app.status || 'new',
                                })
                              }
                            >
