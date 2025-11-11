@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Trophy, Medal, Award, TrendingUp, Mail, Phone, Loader2, Briefcase, PlayCircle, CheckCircle2, Trash2, GitCompare, Search, FileText, Download, ExternalLink, Filter } from "lucide-react";
+import { Trophy, Medal, Award, TrendingUp, Mail, Phone, Loader2, Briefcase, PlayCircle, CheckCircle2, Trash2, GitCompare, Search, FileText, Download, ExternalLink, Filter, ArrowRightLeft, History, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -46,6 +46,7 @@ const Rankings = () => {
   const [expandedQuestions, setExpandedQuestions] = useState<string | null>(null);
   const [expandedComments, setExpandedComments] = useState<string | null>(null);
   const [viewingResume, setViewingResume] = useState<{ url: string; name: string } | null>(null);
+  const [viewingStatusHistory, setViewingStatusHistory] = useState<string | null>(null);
   
   // Advanced filters
   const [scoreRange, setScoreRange] = useState<[number, number]>([0, 100]);
@@ -380,6 +381,32 @@ const Rankings = () => {
     }
   };
 
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ applicationId, newStatus }: { applicationId: string; newStatus: string }) => {
+      const { error } = await supabase
+        .from('applications')
+        .update({ status: newStatus })
+        .eq('id', applicationId);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['rankedApplications'] });
+      queryClient.invalidateQueries({ queryKey: ['statusHistory'] });
+      toast({
+        title: "Status Updated",
+        description: "Candidate status updated successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update status",
+        variant: "destructive",
+      });
+    }
+  });
+
   const deleteMutation = useMutation({
     mutationFn: async (applicationId: string) => {
       const { error } = await supabase
@@ -403,6 +430,27 @@ const Rankings = () => {
         variant: "destructive",
       });
     }
+  });
+
+  // Fetch status history for a specific application
+  const { data: statusHistory } = useQuery({
+    queryKey: ['statusHistory', viewingStatusHistory],
+    queryFn: async () => {
+      if (!viewingStatusHistory) return null;
+      
+      const { data, error } = await supabase
+        .from('application_status_history')
+        .select(`
+          *,
+          profiles:changed_by(full_name, email)
+        `)
+        .eq('application_id', viewingStatusHistory)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!viewingStatusHistory,
   });
 
   const getRankIcon = (index: number) => {
@@ -683,9 +731,42 @@ const Rankings = () => {
                             )}
                           </div>
                         </div>
-                      </div>
-                      <div className="text-right flex flex-col items-end gap-2">
-                        {isAnalyzingStatus || isPending ? (
+                       </div>
+                       <div className="text-right flex flex-col items-end gap-2">
+                         {/* Status Workflow Selector */}
+                         <div className="w-48 mb-2">
+                           <Select
+                             value={app.status || 'new'}
+                             onValueChange={(newStatus) =>
+                               updateStatusMutation.mutate({
+                                 applicationId: app.id,
+                                 newStatus,
+                               })
+                             }
+                           >
+                             <SelectTrigger className="text-sm bg-background">
+                               <SelectValue />
+                             </SelectTrigger>
+                             <SelectContent className="bg-background z-50">
+                               <SelectItem value="new">🆕 New</SelectItem>
+                               <SelectItem value="reviewed">👁️ Reviewed</SelectItem>
+                               <SelectItem value="interview">💬 Interview</SelectItem>
+                               <SelectItem value="offer">🎁 Offer</SelectItem>
+                               <SelectItem value="hired">✅ Hired</SelectItem>
+                               <SelectItem value="rejected">❌ Rejected</SelectItem>
+                             </SelectContent>
+                           </Select>
+                         </div>
+                         <Button
+                           variant="ghost"
+                           size="sm"
+                           className="gap-2 text-xs"
+                           onClick={() => setViewingStatusHistory(app.id)}
+                         >
+                           <History className="w-3 h-3" />
+                           View History
+                         </Button>
+                         {isAnalyzingStatus || isPending ? (
                           <>
                             <Badge variant="secondary" className="gap-2">
                               <Loader2 className="w-3 h-3 animate-spin" />
@@ -898,6 +979,70 @@ const Rankings = () => {
                   Open in New Tab
                 </Button>
                 <AlertDialogCancel>Close</AlertDialogCancel>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
+
+        {/* Status History Dialog */}
+        {viewingStatusHistory && (
+          <AlertDialog open={!!viewingStatusHistory} onOpenChange={() => setViewingStatusHistory(null)}>
+            <AlertDialogContent className="max-w-2xl">
+              <AlertDialogHeader>
+                <AlertDialogTitle className="flex items-center gap-2">
+                  <History className="w-5 h-5" />
+                  Status Change History
+                </AlertDialogTitle>
+              </AlertDialogHeader>
+              <div className="max-h-96 overflow-y-auto">
+                {statusHistory && statusHistory.length > 0 ? (
+                  <div className="space-y-3">
+                    {statusHistory.map((history: any) => (
+                      <div key={history.id} className="border rounded-lg p-4 bg-muted/30">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <ArrowRightLeft className="w-4 h-4 text-primary" />
+                            <span className="text-sm font-medium">
+                              {history.old_status ? (
+                                <>
+                                  <Badge variant="outline" className="mr-2">{history.old_status}</Badge>
+                                  →
+                                  <Badge variant="default" className="ml-2">{history.new_status}</Badge>
+                                </>
+                              ) : (
+                                <Badge variant="default">{history.new_status}</Badge>
+                              )}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <Clock className="w-3 h-3" />
+                            {new Date(history.created_at).toLocaleString()}
+                          </div>
+                        </div>
+                        {history.profiles && (
+                          <div className="text-xs text-muted-foreground">
+                            Changed by: {history.profiles.full_name || history.profiles.email}
+                          </div>
+                        )}
+                        {history.notes && (
+                          <div className="text-sm mt-2 p-2 bg-background rounded">
+                            {history.notes}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <History className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                    <p>No status changes recorded yet</p>
+                  </div>
+                )}
+              </div>
+              <AlertDialogFooter>
+                <AlertDialogAction onClick={() => setViewingStatusHistory(null)}>
+                  Close
+                </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
