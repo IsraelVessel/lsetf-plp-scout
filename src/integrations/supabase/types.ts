@@ -252,6 +252,47 @@ export type Database = {
         }
         Relationships: []
       }
+      reminders: {
+        Row: {
+          application_id: string
+          created_at: string
+          id: string
+          reminder_status: string
+          reminder_type: string
+          scheduled_for: string
+          sent_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          application_id: string
+          created_at?: string
+          id?: string
+          reminder_status?: string
+          reminder_type: string
+          scheduled_for: string
+          sent_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          application_id?: string
+          created_at?: string
+          id?: string
+          reminder_status?: string
+          reminder_type?: string
+          scheduled_for?: string
+          sent_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reminders_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       skills: {
         Row: {
           application_id: string

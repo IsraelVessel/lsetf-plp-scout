@@ -7,6 +7,7 @@ import Dashboard from "./pages/Dashboard";
 import Upload from "./pages/Upload";
 import BatchUpload from "./pages/BatchUpload";
 import Rankings from "./pages/Rankings";
+import Kanban from "./pages/Kanban";
 import Auth from "./pages/Auth";
 import AdminSetup from "./pages/AdminSetup";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -28,6 +29,7 @@ const App = () => (
           <Route path="/upload" element={<ProtectedRoute><Upload /></ProtectedRoute>} />
           <Route path="/batch-upload" element={<ProtectedRoute><BatchUpload /></ProtectedRoute>} />
           <Route path="/rankings" element={<ProtectedRoute><Rankings /></ProtectedRoute>} />
+          <Route path="/kanban" element={<ProtectedRoute><Kanban /></ProtectedRoute>} />
           <Route path="/admin-dashboard" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

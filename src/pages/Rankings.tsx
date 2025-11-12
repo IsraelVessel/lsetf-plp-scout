@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Trophy, Medal, Award, TrendingUp, Mail, Phone, Loader2, Briefcase, PlayCircle, CheckCircle2, Trash2, GitCompare, Search, FileText, Download, ExternalLink, Filter, ArrowRightLeft, History, Clock } from "lucide-react";
+import { Trophy, Medal, Award, TrendingUp, Mail, Phone, Loader2, Briefcase, PlayCircle, CheckCircle2, Trash2, GitCompare, Search, FileText, Download, ExternalLink, Filter, ArrowRightLeft, History, Clock, FileDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -32,6 +32,7 @@ import {
 import { CandidateComparison } from "@/components/CandidateComparison";
 import { InterviewQuestions } from "@/components/InterviewQuestions";
 import { CommentsSection } from "@/components/CommentsSection";
+import { exportCandidateToPDF, exportMultipleCandidatesToPDF } from "@/utils/pdfExport";
 
 const Rankings = () => {
   const { toast } = useToast();
@@ -519,6 +520,21 @@ const Rankings = () => {
               >
                 <Download className="h-4 w-4" />
                 Export CSV
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  if (selectedIds.size > 0) {
+                    const selectedApps = filteredApplications?.filter(app => selectedIds.has(app.id)) || [];
+                    exportMultipleCandidatesToPDF(selectedApps as any);
+                  } else if (filteredApplications && filteredApplications.length > 0) {
+                    exportMultipleCandidatesToPDF(filteredApplications as any);
+                  }
+                }}
+                className="gap-2"
+              >
+                <FileDown className="h-4 w-4" />
+                Export PDF
               </Button>
               <Button
                 variant={compareMode ? "default" : "outline"}
