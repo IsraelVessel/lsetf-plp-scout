@@ -1,6 +1,6 @@
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Users, TrendingUp, Database, LogOut, FolderUp, BarChart3, LayoutGrid } from "lucide-react";
+import { Users, TrendingUp, Database, LogOut, FolderUp, BarChart3 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import veniaLogo from "@/assets/venia-logo.png";
@@ -83,15 +83,6 @@ const Header = () => {
             >
               <TrendingUp className="w-4 h-4" />
               Rankings
-            </Button>
-          </Link>
-          <Link to="/kanban">
-            <Button 
-              variant={isActive("/kanban") ? "default" : "ghost"}
-              className="gap-2"
-            >
-              <LayoutGrid className="w-4 h-4" />
-              Kanban
             </Button>
           </Link>
           {userRole && (userRole === 'admin' || userRole === 'recruiter') && (
