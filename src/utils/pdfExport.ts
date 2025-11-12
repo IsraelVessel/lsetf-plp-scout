@@ -2,7 +2,7 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
 interface CandidateData {
-  candidate: {
+  candidates: {
     name: string;
     email: string;
     phone?: string;
@@ -30,7 +30,7 @@ export const exportCandidateToPDF = async (application: CandidateData) => {
   const margin = 20;
   let yPosition = margin;
 
-  const candidate = application.candidate;
+  const candidate = application.candidates;
   const analysis = application.ai_analysis?.[0];
 
   // Header
@@ -207,7 +207,7 @@ export const exportMultipleCandidatesToPDF = async (applications: CandidateData[
     pdf.addPage();
     let yPosition = margin;
 
-    const candidate = app.candidate;
+    const candidate = app.candidates;
     const analysis = app.ai_analysis?.[0];
 
     // Header

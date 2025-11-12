@@ -736,12 +736,22 @@ const Rankings = () => {
                       </div>
                       <div className="flex items-start justify-between flex-1">
                         <div className="flex items-center gap-4 flex-1">
-                        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-muted">
-                          {!isAnalyzingStatus && !isPending && getRankIcon(index) || (
-                            <span className="text-lg font-bold">#{index + 1}</span>
-                          )}
-                        </div>
-                        <div className="flex-1">
+                         <div className="flex flex-col items-center justify-center w-16">
+                           <div className="flex items-center justify-center w-12 h-12 rounded-full bg-muted mb-1">
+                             {!isAnalyzingStatus && !isPending && getRankIcon(index) || (
+                               <span className="text-lg font-bold">#{index + 1}</span>
+                             )}
+                           </div>
+                           {!isAnalyzingStatus && !isPending && analysis && (
+                             <div className="text-center">
+                               <div className={`text-sm font-bold ${getScoreColor(analysis.overall_score || 0)}`}>
+                                 {analysis.overall_score || 0}
+                               </div>
+                               <div className="text-xs text-muted-foreground">score</div>
+                             </div>
+                           )}
+                         </div>
+                         <div className="flex-1">
                           <CardTitle className="text-2xl mb-1">{candidate.name}</CardTitle>
                           {app.job_role && (
                             <div className="mb-2">
@@ -766,41 +776,54 @@ const Rankings = () => {
                         </div>
                        </div>
                        <div className="text-right flex flex-col items-end gap-2">
-                         {/* Status Workflow Selector */}
-                         <div className="w-48 mb-2">
-                           <Select
-                             value={app.status || 'new'}
-                             onValueChange={(newStatus) =>
-                               updateStatusMutation.mutate({
-                                 applicationId: app.id,
-                                 newStatus,
-                                 oldStatus: app.status || 'new',
-                               })
-                             }
-                           >
-                             <SelectTrigger className="text-sm bg-background">
-                               <SelectValue />
-                             </SelectTrigger>
-                             <SelectContent className="bg-background z-50">
-                               <SelectItem value="new">🆕 New</SelectItem>
-                               <SelectItem value="reviewed">👁️ Reviewed</SelectItem>
-                               <SelectItem value="interview">💬 Interview</SelectItem>
-                               <SelectItem value="offer">🎁 Offer</SelectItem>
-                               <SelectItem value="hired">✅ Hired</SelectItem>
-                               <SelectItem value="rejected">❌ Rejected</SelectItem>
-                             </SelectContent>
-                           </Select>
-                         </div>
-                         <Button
-                           variant="ghost"
-                           size="sm"
-                           className="gap-2 text-xs"
-                           onClick={() => setViewingStatusHistory(app.id)}
-                         >
-                           <History className="w-3 h-3" />
-                           View History
-                         </Button>
-                         {isAnalyzingStatus || isPending ? (
+                          {/* Status Workflow Selector */}
+                          <div className="w-48 mb-2">
+                            <Select
+                              value={app.status || 'new'}
+                              onValueChange={(newStatus) =>
+                                updateStatusMutation.mutate({
+                                  applicationId: app.id,
+                                  newStatus,
+                                  oldStatus: app.status || 'new',
+                                })
+                              }
+                            >
+                              <SelectTrigger className="text-sm bg-background">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent className="bg-background z-50">
+                                <SelectItem value="new">🆕 New</SelectItem>
+                                <SelectItem value="reviewed">👁️ Reviewed</SelectItem>
+                                <SelectItem value="interview">💬 Interview</SelectItem>
+                                <SelectItem value="offer">🎁 Offer</SelectItem>
+                                <SelectItem value="hired">✅ Hired</SelectItem>
+                                <SelectItem value="rejected">❌ Rejected</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="gap-2 text-xs"
+                              onClick={() => setViewingStatusHistory(app.id)}
+                            >
+                              <History className="w-3 h-3" />
+                              View History
+                            </Button>
+                            {!isAnalyzingStatus && !isPending && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="gap-2 text-xs"
+                                onClick={() => exportCandidateToPDF(app as any)}
+                              >
+                                <FileDown className="w-3 h-3" />
+                                Export PDF
+                              </Button>
+                            )}
+                          </div>
+                          {isAnalyzingStatus || isPending ? (
                           <>
                             <Badge variant="secondary" className="gap-2">
                               <Loader2 className="w-3 h-3 animate-spin" />
