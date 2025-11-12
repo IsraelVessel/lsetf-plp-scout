@@ -52,8 +52,8 @@ const Rankings = () => {
   // Advanced filters
   const [scoreRange, setScoreRange] = useState<[number, number]>([0, 100]);
   const [skillFilter, setSkillFilter] = useState<string>("");
-  const [experienceFilter, setExperienceFilter] = useState<string>("");
-  const [educationFilter, setEducationFilter] = useState<string>("");
+  const [experienceFilter, setExperienceFilter] = useState<string>("all");
+  const [educationFilter, setEducationFilter] = useState<string>("all");
   const [showFilters, setShowFilters] = useState(false);
 
   // Check if user is admin
@@ -178,7 +178,7 @@ const Rankings = () => {
     }
 
     // Experience filter
-    if (experienceFilter) {
+    if (experienceFilter && experienceFilter !== "all") {
       if (!analysis?.experience_score) return false;
       const expScore = analysis.experience_score;
       if (experienceFilter === "entry" && expScore > 40) return false;
@@ -187,7 +187,7 @@ const Rankings = () => {
     }
 
     // Education filter
-    if (educationFilter) {
+    if (educationFilter && educationFilter !== "all") {
       if (!analysis?.education_score) return false;
       const eduScore = analysis.education_score;
       if (educationFilter === "basic" && eduScore > 40) return false;
@@ -356,8 +356,8 @@ const Rankings = () => {
   const clearFilters = () => {
     setScoreRange([0, 100]);
     setSkillFilter("");
-    setExperienceFilter("");
-    setEducationFilter("");
+    setExperienceFilter("all");
+    setEducationFilter("all");
   };
 
   const retryAnalysis = async (applicationId: string) => {
@@ -621,7 +621,7 @@ const Rankings = () => {
                         <SelectValue placeholder="All levels" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">All levels</SelectItem>
+                        <SelectItem value="all">All levels</SelectItem>
                         <SelectItem value="entry">Entry (0-40)</SelectItem>
                         <SelectItem value="mid">Mid (41-70)</SelectItem>
                         <SelectItem value="senior">Senior (71+)</SelectItem>
@@ -636,7 +636,7 @@ const Rankings = () => {
                         <SelectValue placeholder="All levels" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">All levels</SelectItem>
+                        <SelectItem value="all">All levels</SelectItem>
                         <SelectItem value="basic">Basic (0-40)</SelectItem>
                         <SelectItem value="intermediate">Intermediate (41-70)</SelectItem>
                         <SelectItem value="advanced">Advanced (71+)</SelectItem>
