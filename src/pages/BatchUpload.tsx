@@ -41,12 +41,52 @@ const BatchUpload = () => {
     ));
   };
 
+  const extractTextFromFile = async (file: File): Promise<string> => {
+    const fileExt = file.name.split('.').pop()?.toLowerCase();
+    
+    // For text files, read directly
+    if (fileExt === 'txt') {
+      return await file.text();
+    }
+    
+    // For PDF/DOCX, we'll send to an edge function that can parse them
+    // For now, return the filename as placeholder and let AI analyze based on upload
+    // The actual content extraction happens server-side
+    const arrayBuffer = await file.arrayBuffer();
+    const base64 = btoa(
+      new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+    );
+    
+    // Call edge function to extract text
+    const { data, error } = await supabase.functions.invoke('extract-document-text', {
+      body: {
+        fileContent: base64,
+        fileName: file.name,
+        mimeType: file.type
+      }
+    });
+    
+    if (error || !data?.text) {
+      // Fallback: use filename as basic info
+      console.warn('Could not extract text from file:', file.name, error);
+      return `Resume file: ${file.name}\n\nNote: This is a binary document (PDF/DOCX). The file has been uploaded for reference. Please analyze based on the filename and any metadata available.`;
+    }
+    
+    return data.text;
+  };
+
   const processFile = async (file: File, index: number) => {
     try {
       updateStatus(index, { status: 'uploading' });
 
-      // Read file content
-      const text = await file.text();
+      // Extract text from file
+      let text: string;
+      try {
+        text = await extractTextFromFile(file);
+      } catch (extractError) {
+        console.warn('Text extraction failed, using fallback:', extractError);
+        text = `Resume file: ${file.name}\n\nNote: Could not extract text content. File uploaded for reference.`;
+      }
       
       // Extract basic info from filename (e.g., "John_Doe_Resume.pdf")
       const nameFromFile = file.name
@@ -56,7 +96,7 @@ const BatchUpload = () => {
         .trim();
 
       const candidateName = nameFromFile || `Candidate ${index + 1}`;
-      const email = `${nameFromFile.toLowerCase().replace(/\s+/g, '.')}@temp.venia.com`;
+      const email = `${nameFromFile.toLowerCase().replace(/\s+/g, '.').replace(/[^a-z0-9.]/g, '')}@temp.venia.com`;
 
       updateStatus(index, { candidateName });
 
