@@ -158,6 +158,22 @@ Provide a comprehensive analysis that captures EVERY detail from the resume. Be 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
       console.error('AI Gateway error:', aiResponse.status, errorText);
+      
+      // Return specific status codes for rate limiting
+      if (aiResponse.status === 429) {
+        return new Response(
+          JSON.stringify({ 
+            error: 'Rate limit exceeded. Please wait and try again.',
+            success: false,
+            retryable: true
+          }),
+          { 
+            status: 429,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      }
+      
       throw new Error(`AI analysis failed: ${aiResponse.status}`);
     }
 
