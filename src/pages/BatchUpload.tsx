@@ -131,7 +131,7 @@ const BatchUpload = () => {
       }
       
       return data;
-    }, 3, 3000); // 3 retries, 3 second base delay
+    }, 3, 1500); // 3 retries, 1.5 second base delay for faster processing
   };
 
   const processFile = async (file: File, index: number) => {
@@ -242,9 +242,9 @@ const BatchUpload = () => {
       await processFile(files[i], i);
       setProgress(Math.round(((i + 1) / files.length) * 100));
       
-      // Add delay between files to avoid rate limits (4 seconds)
+      // Add shorter delay between files (1.5 seconds) - flash-lite is faster
       if (i < files.length - 1) {
-        await delay(4000);
+        await delay(1500);
       }
     }
 
@@ -338,7 +338,7 @@ const BatchUpload = () => {
                   disabled={isProcessing}
                 />
                 <p className="text-sm text-muted-foreground">
-                  Select multiple PDF, Word, or text files. Each file will be analyzed separately with ~4 second intervals.
+                  Select multiple PDF, Word, or text files. Fast processing with comprehensive AI analysis.
                 </p>
               </div>
 
