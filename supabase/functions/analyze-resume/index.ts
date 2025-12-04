@@ -38,41 +38,26 @@ serve(async (req) => {
       .eq('id', applicationId);
 
     // Prepare AI prompt for comprehensive resume analysis
-    const prompt = `You are analyzing a candidate application for Venia recruitment programs. Conduct a THOROUGH and DETAILED analysis of EVERY section of their CV/resume.
+    const prompt = `Analyze this candidate's CV/resume for Venia recruitment. Extract EVERY detail comprehensively.
 
 RESUME/CV:
 ${resumeText}
 
 ${coverLetter ? `COVER LETTER:\n${coverLetter}` : ''}
 
-ANALYSIS REQUIREMENTS:
+EXTRACT AND SCORE:
 
-1. SKILLS ASSESSMENT (0-100):
-   - Evaluate ALL technical skills mentioned
-   - Assess soft skills and competencies
-   - Consider skill relevance and proficiency level
-   - Extract EVERY skill mentioned (aim for 8-15 skills)
+1. SKILLS (Score 0-100): List ALL technical skills (programming, tools, frameworks), soft skills (leadership, communication), languages, certifications. Extract minimum 10-20 skills with proficiency levels.
 
-2. EXPERIENCE EVALUATION (0-100):
-   - Analyze ALL work experiences listed
-   - Consider duration, responsibilities, and achievements
-   - Evaluate career progression and relevance
-   - Note specific accomplishments and metrics
+2. EXPERIENCE (Score 0-100): Document ALL jobs with company names, titles, durations, responsibilities, achievements, metrics/numbers. Calculate total years of experience.
 
-3. EDUCATION REVIEW (0-100):
-   - Examine ALL educational qualifications
-   - Consider certifications, courses, and training
-   - Evaluate relevance to applied position
-   - Note academic achievements and honors
+3. EDUCATION (Score 0-100): All degrees, institutions, years, GPA if mentioned, certifications, online courses, bootcamps, workshops.
 
-4. OVERALL FIT (0-100):
-   - Holistic assessment combining all factors
-   - Consider cultural fit and potential
-   - Evaluate alignment with job requirements
+4. OVERALL (Score 0-100): Weighted combination considering skill depth, experience relevance, education quality.
 
-Provide a comprehensive analysis that captures EVERY detail from the resume. Be thorough and precise.`;
+Be exhaustive - extract EVERY piece of information from the resume.`;
 
-    // Call Lovable AI Gateway with structured output
+    // Call Lovable AI Gateway with structured output - using flash-lite for speed
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -80,11 +65,11 @@ Provide a comprehensive analysis that captures EVERY detail from the resume. Be 
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: 'google/gemini-2.5-flash-lite',
         messages: [
           { 
             role: 'system', 
-            content: 'You are an expert HR analyst specializing in candidate evaluation for employment and upskilling programs. Provide detailed, objective assessments.' 
+            content: 'You are an expert HR analyst. Provide thorough, detailed candidate assessments. Extract every skill, experience, and qualification mentioned.' 
           },
           { role: 'user', content: prompt }
         ],
@@ -99,50 +84,83 @@ Provide a comprehensive analysis that captures EVERY detail from the resume. Be 
                 properties: {
                   skills_score: {
                     type: 'number',
-                    description: 'Score for technical and soft skills (0-100)'
+                    description: 'Score 0-100 based on skill quantity, depth, and relevance'
                   },
                   experience_score: {
                     type: 'number',
-                    description: 'Score for work experience (0-100)'
+                    description: 'Score 0-100 based on years, roles, achievements'
                   },
                   education_score: {
                     type: 'number',
-                    description: 'Score for educational background (0-100)'
+                    description: 'Score 0-100 based on degrees, certifications, relevance'
                   },
                   overall_score: {
                     type: 'number',
-                    description: 'Overall recommendation score (0-100)'
+                    description: 'Weighted overall score 0-100'
+                  },
+                  total_years_experience: {
+                    type: 'number',
+                    description: 'Total years of professional experience'
+                  },
+                  highest_education: {
+                    type: 'string',
+                    description: 'Highest degree obtained (e.g., PhD, Masters, Bachelors, Diploma, High School)'
                   },
                   skills: {
                     type: 'array',
                     items: {
                       type: 'object',
                       properties: {
-                        name: { type: 'string' },
+                        name: { type: 'string', description: 'Skill name' },
                         proficiency: { 
                           type: 'string',
                           enum: ['beginner', 'intermediate', 'advanced', 'expert']
+                        },
+                        category: {
+                          type: 'string',
+                          enum: ['technical', 'soft', 'language', 'tool', 'certification']
                         }
                       },
-                      required: ['name', 'proficiency'],
+                      required: ['name', 'proficiency', 'category'],
                       additionalProperties: false
-                    }
+                    },
+                    description: 'Extract ALL skills mentioned (aim for 10-20)'
                   },
-                   recommendations: {
+                  work_history: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        company: { type: 'string' },
+                        title: { type: 'string' },
+                        duration: { type: 'string' },
+                        highlights: { type: 'string' }
+                      },
+                      required: ['company', 'title'],
+                      additionalProperties: false
+                    },
+                    description: 'All jobs listed on resume'
+                  },
+                  recommendations: {
                     type: 'string',
-                    description: 'Detailed recommendations (3-5 sentences) covering fit, strengths, and development areas'
+                    description: 'Detailed recommendations covering strengths, fit, and areas for development (4-6 sentences)'
                   },
                   summary: {
                     type: 'string',
-                    description: 'Comprehensive summary (4-6 sentences) analyzing experience, education, key strengths, and overall candidate potential'
+                    description: 'Comprehensive candidate profile summary with key qualifications (5-7 sentences)'
                   },
                   experience_details: {
                     type: 'string',
-                    description: 'Detailed breakdown of work experience, noting key roles, achievements, and years of experience'
+                    description: 'Detailed analysis of career progression, achievements, responsibilities'
                   },
                   education_details: {
                     type: 'string',
-                    description: 'Detailed summary of educational background, certifications, and relevant training'
+                    description: 'All educational qualifications, certifications, courses, training programs'
+                  },
+                  key_achievements: {
+                    type: 'array',
+                    items: { type: 'string' },
+                    description: 'Top 3-5 notable achievements with metrics if available'
                   }
                 },
                 required: ['skills_score', 'experience_score', 'education_score', 'overall_score', 'skills', 'recommendations', 'summary', 'experience_details', 'education_details'],
