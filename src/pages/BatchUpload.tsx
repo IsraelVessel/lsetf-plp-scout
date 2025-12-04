@@ -6,16 +6,48 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Upload, Loader2, CheckCircle, XCircle, FileText } from "lucide-react";
+import { Upload, Loader2, CheckCircle, XCircle, FileText, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Progress } from "@/components/ui/progress";
 
 interface UploadStatus {
   file: File;
-  status: 'pending' | 'uploading' | 'analyzing' | 'success' | 'error';
+  status: 'pending' | 'uploading' | 'analyzing' | 'success' | 'error' | 'rate-limited';
   error?: string;
   candidateName?: string;
 }
+
+// Delay helper
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Retry with exponential backoff
+const retryWithBackoff = async <T,>(
+  fn: () => Promise<T>,
+  maxRetries: number = 3,
+  baseDelay: number = 2000
+): Promise<T> => {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error as Error;
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      // Check if it's a rate limit error
+      if (errorMessage.includes('429') || errorMessage.includes('rate')) {
+        const waitTime = baseDelay * Math.pow(2, attempt);
+        console.log(`Rate limited, waiting ${waitTime}ms before retry ${attempt + 1}/${maxRetries}`);
+        await delay(waitTime);
+      } else {
+        throw error; // Non-rate-limit errors should fail immediately
+      }
+    }
+  }
+  
+  throw lastError;
+};
 
 const BatchUpload = () => {
   const navigate = useNavigate();
@@ -49,30 +81,57 @@ const BatchUpload = () => {
       return await file.text();
     }
     
-    // For PDF/DOCX, we'll send to an edge function that can parse them
-    // For now, return the filename as placeholder and let AI analyze based on upload
-    // The actual content extraction happens server-side
+    // For PDF/DOCX, send to edge function with retry
     const arrayBuffer = await file.arrayBuffer();
     const base64 = btoa(
       new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
     );
     
-    // Call edge function to extract text
-    const { data, error } = await supabase.functions.invoke('extract-document-text', {
-      body: {
-        fileContent: base64,
-        fileName: file.name,
-        mimeType: file.type
+    const result = await retryWithBackoff(async () => {
+      const { data, error } = await supabase.functions.invoke('extract-document-text', {
+        body: {
+          fileContent: base64,
+          fileName: file.name,
+          mimeType: file.type
+        }
+      });
+      
+      if (error) {
+        throw new Error(error.message || 'Text extraction failed');
       }
+      
+      return data;
     });
     
-    if (error || !data?.text) {
-      // Fallback: use filename as basic info
-      console.warn('Could not extract text from file:', file.name, error);
-      return `Resume file: ${file.name}\n\nNote: This is a binary document (PDF/DOCX). The file has been uploaded for reference. Please analyze based on the filename and any metadata available.`;
+    if (!result?.text) {
+      console.warn('Could not extract text from file:', file.name);
+      return `Resume file: ${file.name}\n\nNote: This is a binary document (PDF/DOCX). The file has been uploaded for reference.`;
     }
     
-    return data.text;
+    return result.text;
+  };
+
+  const analyzeResume = async (applicationId: string, text: string) => {
+    return retryWithBackoff(async () => {
+      const { data, error } = await supabase.functions.invoke('analyze-resume', {
+        body: {
+          applicationId,
+          resumeText: text,
+          coverLetter: ''
+        }
+      });
+      
+      if (error) {
+        throw new Error(error.message || 'Analysis failed');
+      }
+      
+      // Check for rate limit error in response
+      if (data?.error?.includes('429')) {
+        throw new Error('Rate limit: 429');
+      }
+      
+      return data;
+    }, 3, 3000); // 3 retries, 3 second base delay
   };
 
   const processFile = async (file: File, index: number) => {
@@ -84,11 +143,16 @@ const BatchUpload = () => {
       try {
         text = await extractTextFromFile(file);
       } catch (extractError) {
+        const errorMsg = extractError instanceof Error ? extractError.message : 'Unknown error';
+        if (errorMsg.includes('429') || errorMsg.includes('rate')) {
+          updateStatus(index, { status: 'rate-limited', error: 'Rate limited - will retry' });
+          throw extractError;
+        }
         console.warn('Text extraction failed, using fallback:', extractError);
         text = `Resume file: ${file.name}\n\nNote: Could not extract text content. File uploaded for reference.`;
       }
       
-      // Extract basic info from filename (e.g., "John_Doe_Resume.pdf")
+      // Extract basic info from filename
       const nameFromFile = file.name
         .replace(/\.(pdf|doc|docx|txt)$/i, '')
         .replace(/[_-]/g, ' ')
@@ -143,24 +207,19 @@ const BatchUpload = () => {
 
       updateStatus(index, { status: 'analyzing' });
 
-      // Call AI analysis function
-      const { error: analysisError } = await supabase.functions.invoke('analyze-resume', {
-        body: {
-          applicationId: application.id,
-          resumeText: text,
-          coverLetter: ''
-        }
-      });
-
-      if (analysisError) throw analysisError;
+      // Call AI analysis with retry
+      await analyzeResume(application.id, text);
 
       updateStatus(index, { status: 'success' });
       
     } catch (error) {
       console.error('Error processing file:', error);
+      const errorMsg = error instanceof Error ? error.message : 'Upload failed';
+      const isRateLimited = errorMsg.includes('429') || errorMsg.includes('rate');
+      
       updateStatus(index, { 
-        status: 'error',
-        error: error instanceof Error ? error.message : 'Upload failed'
+        status: isRateLimited ? 'rate-limited' : 'error',
+        error: isRateLimited ? 'Rate limited - try again later' : errorMsg
       });
     }
   };
@@ -178,31 +237,39 @@ const BatchUpload = () => {
     setIsProcessing(true);
     setProgress(0);
 
-    // Process files in parallel (max 3 at a time to avoid rate limits)
-    const batchSize = 3;
-    for (let i = 0; i < files.length; i += batchSize) {
-      const batch = files.slice(i, i + batchSize);
-      const batchIndices = Array.from({ length: batch.length }, (_, j) => i + j);
+    // Process files ONE AT A TIME with delays to avoid rate limits
+    for (let i = 0; i < files.length; i++) {
+      await processFile(files[i], i);
+      setProgress(Math.round(((i + 1) / files.length) * 100));
       
-      await Promise.all(
-        batch.map((file, localIndex) => 
-          processFile(file, batchIndices[localIndex])
-        )
-      );
-
-      setProgress(Math.round(((i + batch.length) / files.length) * 100));
+      // Add delay between files to avoid rate limits (4 seconds)
+      if (i < files.length - 1) {
+        await delay(4000);
+      }
     }
 
     setIsProcessing(false);
     
-    const successCount = uploadStatuses.filter(s => s.status === 'success').length;
-    const errorCount = uploadStatuses.filter(s => s.status === 'error').length;
+    // Get final status counts
+    const finalStatuses = uploadStatuses;
+    const successCount = finalStatuses.filter(s => s.status === 'success').length;
+    const errorCount = finalStatuses.filter(s => s.status === 'error').length;
+    const rateLimitedCount = finalStatuses.filter(s => s.status === 'rate-limited').length;
 
-    toast({
-      title: "Batch upload complete",
-      description: `${successCount} successful, ${errorCount} failed`,
-      duration: 5000
-    });
+    if (rateLimitedCount > 0) {
+      toast({
+        title: "Some files were rate limited",
+        description: `${successCount} successful, ${rateLimitedCount} rate limited, ${errorCount} failed. Try again in a minute.`,
+        variant: "destructive",
+        duration: 8000
+      });
+    } else {
+      toast({
+        title: "Batch upload complete",
+        description: `${successCount} successful, ${errorCount} failed`,
+        duration: 5000
+      });
+    }
 
     // Navigate to rankings after a delay if at least one succeeded
     if (successCount > 0) {
@@ -216,6 +283,8 @@ const BatchUpload = () => {
         return <CheckCircle className="w-5 h-5 text-green-500" />;
       case 'error':
         return <XCircle className="w-5 h-5 text-destructive" />;
+      case 'rate-limited':
+        return <AlertCircle className="w-5 h-5 text-yellow-500" />;
       case 'uploading':
       case 'analyzing':
         return <Loader2 className="w-5 h-5 animate-spin text-primary" />;
@@ -230,6 +299,8 @@ const BatchUpload = () => {
         return 'Analysis complete';
       case 'error':
         return `Error: ${status.error}`;
+      case 'rate-limited':
+        return 'Rate limited - retry later';
       case 'uploading':
         return 'Uploading...';
       case 'analyzing':
@@ -252,7 +323,7 @@ const BatchUpload = () => {
                 Batch Resume Upload
               </CardTitle>
               <CardDescription>
-                Upload multiple resumes at once for fast AI-powered analysis
+                Upload multiple resumes at once for AI-powered analysis. Files are processed sequentially to ensure quality.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -267,7 +338,7 @@ const BatchUpload = () => {
                   disabled={isProcessing}
                 />
                 <p className="text-sm text-muted-foreground">
-                  Select multiple PDF, Word, or text files. Each file will be analyzed separately.
+                  Select multiple PDF, Word, or text files. Each file will be analyzed separately with ~4 second intervals.
                 </p>
               </div>
 
@@ -300,7 +371,7 @@ const BatchUpload = () => {
                   {isProcessing && (
                     <div className="space-y-2">
                       <div className="flex justify-between text-sm">
-                        <span>Processing...</span>
+                        <span>Processing (1 file at a time)...</span>
                         <span>{progress}%</span>
                       </div>
                       <Progress value={progress} />
