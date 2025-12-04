@@ -137,6 +137,57 @@ export type Database = {
           },
         ]
       }
+      candidate_job_matches: {
+        Row: {
+          application_id: string
+          created_at: string
+          education_match: number | null
+          experience_match: number | null
+          id: string
+          job_requirement_id: string
+          match_details: Json | null
+          match_score: number
+          skills_match: number | null
+        }
+        Insert: {
+          application_id: string
+          created_at?: string
+          education_match?: number | null
+          experience_match?: number | null
+          id?: string
+          job_requirement_id: string
+          match_details?: Json | null
+          match_score?: number
+          skills_match?: number | null
+        }
+        Update: {
+          application_id?: string
+          created_at?: string
+          education_match?: number | null
+          experience_match?: number | null
+          id?: string
+          job_requirement_id?: string
+          match_details?: Json | null
+          match_score?: number
+          skills_match?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "candidate_job_matches_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "candidate_job_matches_job_requirement_id_fkey"
+            columns: ["job_requirement_id"]
+            isOneToOne: false
+            referencedRelation: "job_requirements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       candidates: {
         Row: {
           created_at: string
@@ -227,6 +278,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      job_requirements: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          education_level: string | null
+          id: string
+          job_role: string
+          min_experience_years: number | null
+          preferred_skills: string[] | null
+          required_skills: string[] | null
+          requirements: Json
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          education_level?: string | null
+          id?: string
+          job_role: string
+          min_experience_years?: number | null
+          preferred_skills?: string[] | null
+          required_skills?: string[] | null
+          requirements?: Json
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          education_level?: string | null
+          id?: string
+          job_role?: string
+          min_experience_years?: number | null
+          preferred_skills?: string[] | null
+          required_skills?: string[] | null
+          requirements?: Json
+          updated_at?: string
+        }
+        Relationships: []
       }
       profiles: {
         Row: {

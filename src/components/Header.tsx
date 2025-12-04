@@ -1,6 +1,6 @@
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Users, TrendingUp, Database, LogOut, FolderUp, BarChart3, LayoutGrid } from "lucide-react";
+import { Users, TrendingUp, Database, LogOut, FolderUp, BarChart3, LayoutGrid, Target } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import veniaLogo from "@/assets/venia-logo.png";
@@ -92,6 +92,15 @@ const Header = () => {
             >
               <LayoutGrid className="w-4 h-4" />
               Kanban
+            </Button>
+          </Link>
+          <Link to="/job-requirements">
+            <Button 
+              variant={isActive("/job-requirements") ? "default" : "ghost"}
+              className="gap-2"
+            >
+              <Target className="w-4 h-4" />
+              Job Matching
             </Button>
           </Link>
           {userRole && (userRole === 'admin' || userRole === 'recruiter') && (
