@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Trophy, Medal, Award, TrendingUp, Mail, Phone, Loader2, Briefcase, PlayCircle, CheckCircle2, Trash2, GitCompare, Search, FileText, Download, ExternalLink, Filter, ArrowRightLeft, History, Clock, FileDown } from "lucide-react";
+import { Trophy, Medal, Award, TrendingUp, Mail, Phone, Loader2, Briefcase, PlayCircle, CheckCircle2, Trash2, GitCompare, Search, FileText, Download, ExternalLink, Filter, ArrowRightLeft, History, Clock, FileDown, Target } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -55,6 +55,8 @@ const Rankings = () => {
   const [experienceFilter, setExperienceFilter] = useState<string>("all");
   const [educationFilter, setEducationFilter] = useState<string>("all");
   const [showFilters, setShowFilters] = useState(false);
+  const [isMatching, setIsMatching] = useState(false);
+  const [matchProgress, setMatchProgress] = useState({ current: 0, total: 0 });
 
   // Check if user is admin
   const { data: isAdmin } = useQuery({
@@ -110,6 +112,44 @@ const Rankings = () => {
       });
     }
   });
+
+  // Fetch job matches for all applications
+  const { data: jobMatches } = useQuery({
+    queryKey: ['jobMatchesForRankings'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('candidate_job_matches')
+        .select(`
+          *,
+          job_requirements(job_role)
+        `)
+        .order('match_score', { ascending: false });
+      
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  // Fetch job requirements for matching
+  const { data: jobRequirements } = useQuery({
+    queryKey: ['jobRequirementsForMatching'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('job_requirements')
+        .select('id, job_role');
+      
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  // Get best match for an application
+  const getBestMatch = (applicationId: string) => {
+    if (!jobMatches) return null;
+    const matches = jobMatches.filter(m => m.application_id === applicationId);
+    if (matches.length === 0) return null;
+    return matches[0]; // Already sorted by match_score desc
+  };
 
   // Setup realtime subscriptions
   useEffect(() => {
@@ -358,6 +398,60 @@ const Rankings = () => {
     setSkillFilter("");
     setExperienceFilter("all");
     setEducationFilter("all");
+  };
+
+  // Match selected candidates to all job requirements
+  const matchToJobs = async () => {
+    if (!jobRequirements || jobRequirements.length === 0) {
+      toast({
+        title: "No Job Requirements",
+        description: "Please create job requirements first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const appsToMatch = selectedIds.size > 0
+      ? filteredApplications?.filter(app => selectedIds.has(app.id) && app.status === 'analyzed')
+      : filteredApplications?.filter(app => app.status === 'analyzed');
+
+    if (!appsToMatch || appsToMatch.length === 0) {
+      toast({
+        title: "No Analyzed Candidates",
+        description: "Select analyzed candidates to match to jobs",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsMatching(true);
+    setMatchProgress({ current: 0, total: jobRequirements.length });
+    let completed = 0;
+    let errors = 0;
+
+    for (const jobReq of jobRequirements) {
+      try {
+        await supabase.functions.invoke('match-candidates', {
+          body: {
+            jobRequirementId: jobReq.id,
+            applicationIds: appsToMatch.map(a => a.id),
+          }
+        });
+        completed++;
+      } catch (error) {
+        console.error(`Failed to match to job ${jobReq.job_role}:`, error);
+        errors++;
+      }
+      setMatchProgress({ current: completed + errors, total: jobRequirements.length });
+    }
+
+    setIsMatching(false);
+    queryClient.invalidateQueries({ queryKey: ['jobMatchesForRankings'] });
+
+    toast({
+      title: "Job Matching Complete",
+      description: `Matched ${appsToMatch.length} candidates to ${completed} jobs${errors > 0 ? `, ${errors} failed` : ''}`,
+    });
   };
 
   const retryAnalysis = async (applicationId: string) => {
@@ -693,6 +787,25 @@ const Rankings = () => {
                       </>
                     )}
                   </Button>
+                  <Button
+                    onClick={matchToJobs}
+                    disabled={isMatching || !jobRequirements?.length}
+                    size="sm"
+                    variant="outline"
+                    className="gap-2"
+                  >
+                    {isMatching ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Matching {matchProgress.current}/{matchProgress.total}
+                      </>
+                    ) : (
+                      <>
+                        <Target className="w-4 h-4" />
+                        Match to Jobs
+                      </>
+                    )}
+                  </Button>
                 </div>
               )}
             </div>
@@ -747,10 +860,26 @@ const Rankings = () => {
                                <div className={`text-sm font-bold ${getScoreColor(analysis.overall_score || 0)}`}>
                                  {analysis.overall_score || 0}
                                </div>
-                               <div className="text-xs text-muted-foreground">score</div>
-                             </div>
-                           )}
-                         </div>
+                              <div className="text-xs text-muted-foreground">score</div>
+                            </div>
+                          )}
+                          {(() => {
+                            const bestMatch = getBestMatch(app.id);
+                            if (bestMatch) {
+                              return (
+                                <div className="mt-1 text-center">
+                                  <div className={`text-xs font-semibold ${bestMatch.match_score >= 80 ? 'text-green-600' : bestMatch.match_score >= 60 ? 'text-blue-600' : 'text-yellow-600'}`}>
+                                    {bestMatch.match_score}%
+                                  </div>
+                                  <div className="text-[10px] text-muted-foreground truncate max-w-[60px]" title={bestMatch.job_requirements?.job_role}>
+                                    {bestMatch.job_requirements?.job_role}
+                                  </div>
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
+                        </div>
                          <div className="flex-1">
                           <CardTitle className="text-2xl mb-1">{candidate.name}</CardTitle>
                           {app.job_role && (
