@@ -7,7 +7,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const MATCH_THRESHOLD = 80; // Notify when score exceeds this
+const DEFAULT_THRESHOLD = 80;
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -15,8 +15,7 @@ serve(async (req) => {
   }
 
   try {
-    const { jobRequirementId, applicationIds, notificationThreshold } = await req.json();
-    const threshold = notificationThreshold ?? MATCH_THRESHOLD;
+    const { jobRequirementId, applicationIds } = await req.json();
 
     if (!jobRequirementId) {
       throw new Error('Job requirement ID is required');
@@ -29,6 +28,23 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
     const resend = resendApiKey ? new Resend(resendApiKey) : null;
+
+    // Fetch notification settings from database
+    const { data: settingsData } = await supabase
+      .from('app_settings')
+      .select('setting_value')
+      .eq('setting_key', 'notification_threshold')
+      .single();
+
+    const settings = settingsData?.setting_value as { 
+      candidate_threshold?: number; 
+      recruiter_notification_enabled?: boolean 
+    } | null;
+    
+    const threshold = settings?.candidate_threshold ?? DEFAULT_THRESHOLD;
+    const recruiterNotificationsEnabled = settings?.recruiter_notification_enabled ?? true;
+
+    console.log(`Using threshold: ${threshold}, recruiter notifications: ${recruiterNotificationsEnabled}`);
 
     // Fetch job requirements
     const { data: jobReq, error: jobError } = await supabase
@@ -69,6 +85,28 @@ serve(async (req) => {
       return new Response(JSON.stringify({ success: true, matches: [], message: 'No applications to match' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
+    }
+
+    // Fetch recruiters for notifications
+    let recruiters: Array<{ email: string; full_name: string | null }> = [];
+    if (recruiterNotificationsEnabled && resend) {
+      const { data: recruiterData } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .in('role', ['admin', 'recruiter']);
+
+      if (recruiterData && recruiterData.length > 0) {
+        const userIds = recruiterData.map(r => r.user_id);
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('email, full_name')
+          .in('id', userIds);
+
+        if (profilesData) {
+          recruiters = profilesData;
+        }
+      }
+      console.log(`Found ${recruiters.length} recruiters for notifications`);
     }
 
     const matches = [];
@@ -216,12 +254,15 @@ Evaluate the candidate's fit for this specific role and provide match scores.`;
     }
 
     // Send email notifications for high-scoring candidates
-    let notificationsSent = 0;
+    let candidateNotificationsSent = 0;
+    let recruiterNotificationsSent = 0;
+
     if (resend && highScoreCandidates.length > 0) {
+      // Send to candidates
       for (const candidate of highScoreCandidates) {
         try {
           await resend.emails.send({
-            from: "Venia Recruitment <onboarding@resend.dev>",
+            from: "Escoger Recruitment <onboarding@resend.dev>",
             to: [candidate.email],
             subject: `Great News! You're a Strong Match for ${candidate.jobRole}`,
             html: `
@@ -261,7 +302,7 @@ Evaluate the candidate's fit for this specific role and provide match scores.`;
                     <div class="footer">
                       <p>Thank you for your interest in joining our team!</p>
                       <p style="margin-top: 20px; font-size: 12px;">
-                        This is an automated notification from Venia's AI-powered recruitment system.
+                        This is an automated notification from Escoger's AI-powered recruitment system.
                       </p>
                     </div>
                   </div>
@@ -270,20 +311,95 @@ Evaluate the candidate's fit for this specific role and provide match scores.`;
               </html>
             `,
           });
-          notificationsSent++;
-          console.log(`High-score notification sent to ${candidate.email} (score: ${candidate.score})`);
+          candidateNotificationsSent++;
+          console.log(`Candidate notification sent to ${candidate.email} (score: ${candidate.score})`);
         } catch (emailError) {
           console.error(`Failed to send notification to ${candidate.email}:`, emailError);
         }
       }
+
+      // Send notifications to recruiters if enabled
+      if (recruiterNotificationsEnabled && recruiters.length > 0) {
+        const candidatesList = highScoreCandidates
+          .map(c => `• ${c.name} - ${c.score}% match for ${c.jobRole}`)
+          .join('\n');
+
+        for (const recruiter of recruiters) {
+          try {
+            await resend.emails.send({
+              from: "Escoger Recruitment <onboarding@resend.dev>",
+              to: [recruiter.email],
+              subject: `🎯 ${highScoreCandidates.length} High-Scoring Candidate${highScoreCandidates.length > 1 ? 's' : ''} Found!`,
+              html: `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                  <style>
+                    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
+                    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                    .header { background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); color: white; padding: 30px; border-radius: 8px 8px 0 0; text-align: center; }
+                    .content { background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px; }
+                    .candidate-list { background: white; border-radius: 8px; padding: 20px; margin: 15px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+                    .candidate-item { padding: 12px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+                    .candidate-item:last-child { border-bottom: none; }
+                    .score-badge { background: #10b981; color: white; padding: 4px 12px; border-radius: 20px; font-weight: 600; }
+                    .footer { text-align: center; margin-top: 30px; color: #666; font-size: 14px; }
+                  </style>
+                </head>
+                <body>
+                  <div class="container">
+                    <div class="header">
+                      <h1>🎯 New High-Scoring Candidates!</h1>
+                      <p>We found ${highScoreCandidates.length} candidate${highScoreCandidates.length > 1 ? 's' : ''} matching ≥${threshold}%</p>
+                    </div>
+                    
+                    <div class="content">
+                      <p>Hi${recruiter.full_name ? ` ${recruiter.full_name}` : ''},</p>
+                      <p>Great news! Our AI matching system has identified the following high-scoring candidates:</p>
+                      
+                      <div class="candidate-list">
+                        ${highScoreCandidates.map(c => `
+                          <div class="candidate-item">
+                            <div>
+                              <strong>${c.name}</strong>
+                              <div style="color: #666; font-size: 14px;">${c.jobRole}</div>
+                            </div>
+                            <span class="score-badge">${c.score}%</span>
+                          </div>
+                        `).join('')}
+                      </div>
+
+                      <p style="text-align: center; margin: 25px 0;">
+                        Log in to Escoger to review these candidates and take the next steps in the hiring process.
+                      </p>
+
+                      <div class="footer">
+                        <p style="margin-top: 20px; font-size: 12px;">
+                          This is an automated notification from Escoger's AI-powered recruitment system.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </body>
+                </html>
+              `,
+            });
+            recruiterNotificationsSent++;
+            console.log(`Recruiter notification sent to ${recruiter.email}`);
+          } catch (emailError) {
+            console.error(`Failed to send recruiter notification to ${recruiter.email}:`, emailError);
+          }
+        }
+      }
     }
 
-    console.log(`Matched ${matches.length} candidates to job: ${jobReq.job_role}. Sent ${notificationsSent} high-score notifications.`);
+    console.log(`Matched ${matches.length} candidates to job: ${jobReq.job_role}. Sent ${candidateNotificationsSent} candidate notifications and ${recruiterNotificationsSent} recruiter notifications.`);
 
     return new Response(JSON.stringify({ 
       success: true, 
       matches,
-      notificationsSent,
+      candidateNotificationsSent,
+      recruiterNotificationsSent,
       highScoreCandidates: highScoreCandidates.length
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

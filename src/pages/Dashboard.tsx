@@ -190,7 +190,7 @@ const Dashboard = () => {
               <TrendingUp className="w-12 h-12 text-secondary mb-4" />
               <CardTitle>Program Integration</CardTitle>
               <CardDescription>
-                Seamlessly connect with Venia's upskilling platform for program matching
+                Seamlessly connect with Escoger's upskilling platform for program matching
               </CardDescription>
             </CardHeader>
           </Card>

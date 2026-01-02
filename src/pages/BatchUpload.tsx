@@ -160,7 +160,7 @@ const BatchUpload = () => {
         .trim();
 
       const candidateName = nameFromFile || `Candidate ${index + 1}`;
-      const email = `${nameFromFile.toLowerCase().replace(/\s+/g, '.').replace(/[^a-z0-9.]/g, '')}@temp.venia.com`;
+      const email = `${nameFromFile.toLowerCase().replace(/\s+/g, '.').replace(/[^a-z0-9.]/g, '')}@temp.escoger.com`;
 
       updateStatus(index, { candidateName });
 
