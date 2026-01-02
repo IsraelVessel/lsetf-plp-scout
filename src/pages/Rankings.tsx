@@ -56,6 +56,7 @@ const Rankings = () => {
   const [educationFilter, setEducationFilter] = useState<string>("all");
   const [showFilters, setShowFilters] = useState(false);
   const [isMatching, setIsMatching] = useState(false);
+  const [matchScoreFilter, setMatchScoreFilter] = useState<[number, number]>([0, 100]);
   const [matchProgress, setMatchProgress] = useState({ current: 0, total: 0 });
 
   // Check if user is admin
@@ -235,6 +236,18 @@ const Rankings = () => {
       if (educationFilter === "advanced" && eduScore <= 70) return false;
     }
 
+    // Job match score filter
+    if (matchScoreFilter[0] > 0 || matchScoreFilter[1] < 100) {
+      const bestMatch = getBestMatch(app.id);
+      if (!bestMatch) {
+        if (matchScoreFilter[0] > 0) return false; // No match and minimum filter set
+      } else {
+        if (bestMatch.match_score < matchScoreFilter[0] || bestMatch.match_score > matchScoreFilter[1]) {
+          return false;
+        }
+      }
+    }
+
     return true;
   });
 
@@ -398,6 +411,7 @@ const Rankings = () => {
     setSkillFilter("");
     setExperienceFilter("all");
     setEducationFilter("all");
+    setMatchScoreFilter([0, 100]);
   };
 
   // Match selected candidates to all job requirements
@@ -673,7 +687,7 @@ const Rankings = () => {
                 <Button variant="outline" className="gap-2">
                   <Filter className="h-4 w-4" />
                   Advanced Filters
-                  {(scoreRange[0] > 0 || scoreRange[1] < 100 || skillFilter || experienceFilter || educationFilter) && (
+                  {(scoreRange[0] > 0 || scoreRange[1] < 100 || skillFilter || experienceFilter !== "all" || educationFilter !== "all" || matchScoreFilter[0] > 0 || matchScoreFilter[1] < 100) && (
                     <Badge variant="secondary" className="ml-1 px-1.5 py-0">!</Badge>
                   )}
                 </Button>
@@ -688,7 +702,7 @@ const Rankings = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Score Range: {scoreRange[0]} - {scoreRange[1]}</Label>
+                    <Label>AI Score Range: {scoreRange[0]} - {scoreRange[1]}</Label>
                     <Slider
                       value={scoreRange}
                       onValueChange={(value) => setScoreRange(value as [number, number])}
@@ -697,6 +711,19 @@ const Rankings = () => {
                       step={5}
                       className="w-full"
                     />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Job Match Score: {matchScoreFilter[0]} - {matchScoreFilter[1]}</Label>
+                    <Slider
+                      value={matchScoreFilter}
+                      onValueChange={(value) => setMatchScoreFilter(value as [number, number])}
+                      min={0}
+                      max={100}
+                      step={5}
+                      className="w-full"
+                    />
+                    <p className="text-xs text-muted-foreground">Filter by best job match score</p>
                   </div>
 
                   <div className="space-y-2">

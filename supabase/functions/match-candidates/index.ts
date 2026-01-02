@@ -1,10 +1,13 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { Resend } from "https://esm.sh/resend@4.0.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+const MATCH_THRESHOLD = 80; // Notify when score exceeds this
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -12,7 +15,8 @@ serve(async (req) => {
   }
 
   try {
-    const { jobRequirementId, applicationIds } = await req.json();
+    const { jobRequirementId, applicationIds, notificationThreshold } = await req.json();
+    const threshold = notificationThreshold ?? MATCH_THRESHOLD;
 
     if (!jobRequirementId) {
       throw new Error('Job requirement ID is required');
@@ -21,8 +25,10 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const lovableApiKey = Deno.env.get('LOVABLE_API_KEY')!;
+    const resendApiKey = Deno.env.get('RESEND_API_KEY');
 
     const supabase = createClient(supabaseUrl, supabaseKey);
+    const resend = resendApiKey ? new Resend(resendApiKey) : null;
 
     // Fetch job requirements
     const { data: jobReq, error: jobError } = await supabase
@@ -66,12 +72,14 @@ serve(async (req) => {
     }
 
     const matches = [];
+    const highScoreCandidates: Array<{ name: string; email: string; score: number; jobRole: string }> = [];
 
     for (const app of applications) {
       const aiAnalysis = app.ai_analysis?.[0];
       const skills = app.skills || [];
       const candidate = Array.isArray(app.candidates) ? app.candidates[0] : app.candidates;
       const candidateName = candidate?.name || 'Unknown';
+      const candidateEmail = candidate?.email || '';
 
       // Build candidate profile for AI matching
       const candidateProfile = {
@@ -160,6 +168,16 @@ Evaluate the candidate's fit for this specific role and provide match scores.`;
 
       const matchData = JSON.parse(toolCall.function.arguments);
 
+      // Check if candidate exceeds threshold for notification
+      if (matchData.match_score >= threshold && candidateEmail) {
+        highScoreCandidates.push({
+          name: candidateName,
+          email: candidateEmail,
+          score: matchData.match_score,
+          jobRole: jobReq.job_role
+        });
+      }
+
       // Upsert match result
       const { error: upsertError } = await supabase
         .from('candidate_job_matches')
@@ -197,9 +215,77 @@ Evaluate the candidate's fit for this specific role and provide match scores.`;
       await new Promise(resolve => setTimeout(resolve, 500));
     }
 
-    console.log(`Matched ${matches.length} candidates to job: ${jobReq.job_role}`);
+    // Send email notifications for high-scoring candidates
+    let notificationsSent = 0;
+    if (resend && highScoreCandidates.length > 0) {
+      for (const candidate of highScoreCandidates) {
+        try {
+          await resend.emails.send({
+            from: "Venia Recruitment <onboarding@resend.dev>",
+            to: [candidate.email],
+            subject: `Great News! You're a Strong Match for ${candidate.jobRole}`,
+            html: `
+              <!DOCTYPE html>
+              <html>
+              <head>
+                <style>
+                  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
+                  .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                  .header { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 30px; border-radius: 8px 8px 0 0; text-align: center; }
+                  .content { background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px; }
+                  .score-card { background: white; border-radius: 8px; padding: 20px; margin: 15px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center; }
+                  .score { font-size: 64px; font-weight: bold; color: #10b981; margin: 10px 0; }
+                  .footer { text-align: center; margin-top: 30px; color: #666; font-size: 14px; }
+                </style>
+              </head>
+              <body>
+                <div class="container">
+                  <div class="header">
+                    <h1>🎉 Congratulations, ${candidate.name}!</h1>
+                    <p>You're an excellent match for the ${candidate.jobRole} position!</p>
+                  </div>
+                  
+                  <div class="content">
+                    <div class="score-card">
+                      <h2 style="color: #333; margin-bottom: 5px;">Your Match Score</h2>
+                      <div class="score">${candidate.score}%</div>
+                      <p style="color: #10b981; font-weight: 600;">
+                        ${candidate.score >= 90 ? 'Outstanding Match!' : 'Strong Match!'}
+                      </p>
+                    </div>
 
-    return new Response(JSON.stringify({ success: true, matches }), {
+                    <p style="text-align: center; margin: 25px 0;">
+                      Based on our AI-powered analysis, your skills and experience align exceptionally well with this role. Our recruitment team will be in touch with you shortly to discuss the next steps.
+                    </p>
+
+                    <div class="footer">
+                      <p>Thank you for your interest in joining our team!</p>
+                      <p style="margin-top: 20px; font-size: 12px;">
+                        This is an automated notification from Venia's AI-powered recruitment system.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </body>
+              </html>
+            `,
+          });
+          notificationsSent++;
+          console.log(`High-score notification sent to ${candidate.email} (score: ${candidate.score})`);
+        } catch (emailError) {
+          console.error(`Failed to send notification to ${candidate.email}:`, emailError);
+        }
+      }
+    }
+
+    console.log(`Matched ${matches.length} candidates to job: ${jobReq.job_role}. Sent ${notificationsSent} high-score notifications.`);
+
+    return new Response(JSON.stringify({ 
+      success: true, 
+      matches,
+      notificationsSent,
+      highScoreCandidates: highScoreCandidates.length
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
