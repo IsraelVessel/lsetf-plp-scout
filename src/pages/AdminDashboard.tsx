@@ -1,18 +1,34 @@
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import Header from "@/components/Header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
-import { Clock, TrendingUp, Award } from "lucide-react";
+import { Clock, TrendingUp, Award, Bell, Save, Loader2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { useToast } from "@/hooks/use-toast";
+
+interface NotificationSettings {
+  candidate_threshold: number;
+  recruiter_notification_enabled: boolean;
+}
 
 const AdminDashboard = () => {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  
   const [processingStats, setProcessingStats] = useState<{ avgTime: number; data: any[] }>({
     avgTime: 0,
     data: []
   });
   const [skillsData, setSkillsData] = useState<any[]>([]);
   const [scoreDistribution, setScoreDistribution] = useState<any[]>([]);
+  const [threshold, setThreshold] = useState(80);
+  const [recruiterNotifications, setRecruiterNotifications] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
   const { data: applications } = useQuery({
     queryKey: ['admin-applications'],
@@ -26,6 +42,66 @@ const AdminDashboard = () => {
     }
   });
 
+  // Fetch notification settings
+  const { data: notificationSettings, isLoading: settingsLoading } = useQuery({
+    queryKey: ['notification-settings'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('app_settings')
+        .select('*')
+        .eq('setting_key', 'notification_threshold')
+        .single();
+      
+      if (error) {
+        console.error('Error fetching settings:', error);
+        return null;
+      }
+      return data;
+    }
+  });
+
+  // Update local state when settings are loaded
+  useEffect(() => {
+    if (notificationSettings?.setting_value) {
+      const settings = notificationSettings.setting_value as unknown as NotificationSettings;
+      setThreshold(settings.candidate_threshold ?? 80);
+      setRecruiterNotifications(settings.recruiter_notification_enabled ?? true);
+    }
+  }, [notificationSettings]);
+
+  const saveSettings = async () => {
+    setIsSaving(true);
+    try {
+      const { error } = await supabase
+        .from('app_settings')
+        .update({
+          setting_value: {
+            candidate_threshold: threshold,
+            recruiter_notification_enabled: recruiterNotifications
+          } as unknown as any
+        })
+        .eq('setting_key', 'notification_threshold');
+
+      if (error) throw error;
+
+      toast({
+        title: "Settings saved",
+        description: "Notification settings have been updated successfully.",
+      });
+      
+      queryClient.invalidateQueries({ queryKey: ['notification-settings'] });
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save settings. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   useEffect(() => {
     if (applications) {
       // Calculate processing times
@@ -36,7 +112,7 @@ const AdminDashboard = () => {
       const processingTimes = applicationsWithAnalysis.map(app => {
         const createdAt = new Date(app.created_at).getTime();
         const analyzedAt = new Date(app.ai_analysis[0].analyzed_at).getTime();
-        return (analyzedAt - createdAt) / 1000; // Convert to seconds
+        return (analyzedAt - createdAt) / 1000;
       });
 
       const avgTime = processingTimes.length > 0
@@ -105,6 +181,74 @@ const AdminDashboard = () => {
             Comprehensive insights into candidate processing and performance metrics
           </p>
         </div>
+
+        {/* Notification Settings Section */}
+        <Card className="mb-8">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Bell className="h-5 w-5 text-primary" />
+              <CardTitle>Email Notification Settings</CardTitle>
+            </div>
+            <CardDescription>
+              Configure when candidates and recruiters receive email notifications
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid gap-6 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="threshold">High-Score Threshold (%)</Label>
+                <div className="flex items-center gap-4">
+                  <Input
+                    id="threshold"
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={threshold}
+                    onChange={(e) => setThreshold(Number(e.target.value))}
+                    className="max-w-24"
+                  />
+                  <span className="text-sm text-muted-foreground">
+                    Candidates with match scores ≥ {threshold}% will receive congratulations emails
+                  </span>
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="recruiter-notify">Notify Recruiters</Label>
+                <div className="flex items-center gap-4">
+                  <Switch
+                    id="recruiter-notify"
+                    checked={recruiterNotifications}
+                    onCheckedChange={setRecruiterNotifications}
+                  />
+                  <span className="text-sm text-muted-foreground">
+                    {recruiterNotifications 
+                      ? "Recruiters will be notified when high-scoring candidates are found" 
+                      : "Recruiter notifications are disabled"}
+                  </span>
+                </div>
+              </div>
+            </div>
+            
+            <Button 
+              onClick={saveSettings} 
+              disabled={isSaving || settingsLoading}
+              className="gap-2"
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4" />
+                  Save Settings
+                </>
+              )}
+            </Button>
+          </CardContent>
+        </Card>
 
         {/* Processing Time Section */}
         <Card className="mb-8">

@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Users, TrendingUp, Database, LogOut, FolderUp, BarChart3, LayoutGrid, Target } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import veniaLogo from "@/assets/venia-logo.png";
+import escogerLogo from "@/assets/venia-logo.png";
 import { useQuery } from "@tanstack/react-query";
 
 const Header = () => {
@@ -42,9 +42,9 @@ const Header = () => {
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center">
         <Link to="/" className="flex items-center space-x-2 mr-8">
-          <img src={veniaLogo} alt="Venia Logo" className="w-10 h-10 rounded-lg" />
+          <img src={escogerLogo} alt="Escoger Logo" className="w-10 h-10 rounded-lg" />
           <span className="font-bold text-xl bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary">
-            Venia
+            Escoger
           </span>
         </Link>
         
