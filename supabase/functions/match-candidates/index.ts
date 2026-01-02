@@ -9,6 +9,41 @@ const corsHeaders = {
 
 const DEFAULT_THRESHOLD = 80;
 
+// Helper function to replace template variables
+function applyTemplate(template: string, variables: Record<string, string>): string {
+  let result = template;
+  for (const [key, value] of Object.entries(variables)) {
+    result = result.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value);
+  }
+  return result;
+}
+
+// Helper to log notification
+async function logNotification(
+  supabase: any,
+  type: string,
+  email: string,
+  name: string | null,
+  subject: string,
+  status: 'sent' | 'failed',
+  error?: string,
+  metadata?: Record<string, unknown>
+) {
+  try {
+    await supabase.from('notification_history').insert({
+      notification_type: type,
+      recipient_email: email,
+      recipient_name: name,
+      subject: subject,
+      status: status,
+      error_message: error || null,
+      metadata: metadata || {}
+    });
+  } catch (e) {
+    console.error('Failed to log notification:', e);
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -45,6 +80,17 @@ serve(async (req) => {
     const recruiterNotificationsEnabled = settings?.recruiter_notification_enabled ?? true;
 
     console.log(`Using threshold: ${threshold}, recruiter notifications: ${recruiterNotificationsEnabled}`);
+
+    // Fetch email templates
+    const { data: templatesData } = await supabase
+      .from('email_templates')
+      .select('*')
+      .eq('is_active', true);
+
+    const candidateTemplate = templatesData?.find((t: any) => t.template_key === 'candidate_high_score');
+    const recruiterTemplate = templatesData?.find((t: any) => t.template_key === 'recruiter_alert');
+
+    console.log(`Templates loaded: candidate=${!!candidateTemplate}, recruiter=${!!recruiterTemplate}`);
 
     // Fetch job requirements
     const { data: jobReq, error: jobError } = await supabase
@@ -96,7 +142,7 @@ serve(async (req) => {
         .in('role', ['admin', 'recruiter']);
 
       if (recruiterData && recruiterData.length > 0) {
-        const userIds = recruiterData.map(r => r.user_id);
+        const userIds = recruiterData.map((r: any) => r.user_id);
         const { data: profilesData } = await supabase
           .from('profiles')
           .select('email, full_name')
@@ -258,136 +304,125 @@ Evaluate the candidate's fit for this specific role and provide match scores.`;
     let recruiterNotificationsSent = 0;
 
     if (resend && highScoreCandidates.length > 0) {
-      // Send to candidates
+      // Send to candidates using custom template if available
       for (const candidate of highScoreCandidates) {
+        const variables = {
+          candidate_name: candidate.name,
+          job_role: candidate.jobRole,
+          match_score: String(candidate.score),
+          score_message: candidate.score >= 90 ? 'Outstanding Match!' : 'Strong Match!',
+          threshold: String(threshold)
+        };
+
+        const subject = candidateTemplate 
+          ? applyTemplate(candidateTemplate.subject_template, variables)
+          : `Great News! You're a Strong Match for ${candidate.jobRole}`;
+        
+        const html = candidateTemplate
+          ? applyTemplate(candidateTemplate.html_template, variables)
+          : getDefaultCandidateHtml(candidate);
+
         try {
           await resend.emails.send({
             from: "Escoger Recruitment <onboarding@resend.dev>",
             to: [candidate.email],
-            subject: `Great News! You're a Strong Match for ${candidate.jobRole}`,
-            html: `
-              <!DOCTYPE html>
-              <html>
-              <head>
-                <style>
-                  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
-                  .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-                  .header { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 30px; border-radius: 8px 8px 0 0; text-align: center; }
-                  .content { background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px; }
-                  .score-card { background: white; border-radius: 8px; padding: 20px; margin: 15px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center; }
-                  .score { font-size: 64px; font-weight: bold; color: #10b981; margin: 10px 0; }
-                  .footer { text-align: center; margin-top: 30px; color: #666; font-size: 14px; }
-                </style>
-              </head>
-              <body>
-                <div class="container">
-                  <div class="header">
-                    <h1>🎉 Congratulations, ${candidate.name}!</h1>
-                    <p>You're an excellent match for the ${candidate.jobRole} position!</p>
-                  </div>
-                  
-                  <div class="content">
-                    <div class="score-card">
-                      <h2 style="color: #333; margin-bottom: 5px;">Your Match Score</h2>
-                      <div class="score">${candidate.score}%</div>
-                      <p style="color: #10b981; font-weight: 600;">
-                        ${candidate.score >= 90 ? 'Outstanding Match!' : 'Strong Match!'}
-                      </p>
-                    </div>
-
-                    <p style="text-align: center; margin: 25px 0;">
-                      Based on our AI-powered analysis, your skills and experience align exceptionally well with this role. Our recruitment team will be in touch with you shortly to discuss the next steps.
-                    </p>
-
-                    <div class="footer">
-                      <p>Thank you for your interest in joining our team!</p>
-                      <p style="margin-top: 20px; font-size: 12px;">
-                        This is an automated notification from Escoger's AI-powered recruitment system.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </body>
-              </html>
-            `,
+            subject: subject,
+            html: html,
           });
           candidateNotificationsSent++;
           console.log(`Candidate notification sent to ${candidate.email} (score: ${candidate.score})`);
+          
+          // Log successful notification
+          await logNotification(
+            supabase,
+            'candidate_match',
+            candidate.email,
+            candidate.name,
+            subject,
+            'sent',
+            undefined,
+            { match_score: candidate.score, job_role: candidate.jobRole }
+          );
         } catch (emailError) {
+          const errorMsg = emailError instanceof Error ? emailError.message : 'Unknown error';
           console.error(`Failed to send notification to ${candidate.email}:`, emailError);
+          
+          // Log failed notification
+          await logNotification(
+            supabase,
+            'candidate_match',
+            candidate.email,
+            candidate.name,
+            subject,
+            'failed',
+            errorMsg,
+            { match_score: candidate.score, job_role: candidate.jobRole }
+          );
         }
       }
 
       // Send notifications to recruiters if enabled
       if (recruiterNotificationsEnabled && recruiters.length > 0) {
-        const candidatesList = highScoreCandidates
-          .map(c => `• ${c.name} - ${c.score}% match for ${c.jobRole}`)
-          .join('\n');
+        const candidatesListHtml = highScoreCandidates.map(c => `
+          <div class="candidate-item">
+            <div><strong>${c.name}</strong><div style="color: #666; font-size: 14px;">${c.jobRole}</div></div>
+            <span class="score-badge">${c.score}%</span>
+          </div>
+        `).join('');
 
         for (const recruiter of recruiters) {
+          const variables = {
+            count: String(highScoreCandidates.length),
+            plural: highScoreCandidates.length > 1 ? 's' : '',
+            threshold: String(threshold),
+            recruiter_greeting: recruiter.full_name ? ` ${recruiter.full_name}` : '',
+            candidates_list: candidatesListHtml
+          };
+
+          const subject = recruiterTemplate
+            ? applyTemplate(recruiterTemplate.subject_template, variables)
+            : `🎯 ${highScoreCandidates.length} High-Scoring Candidate${highScoreCandidates.length > 1 ? 's' : ''} Found!`;
+          
+          const html = recruiterTemplate
+            ? applyTemplate(recruiterTemplate.html_template, variables)
+            : getDefaultRecruiterHtml(highScoreCandidates, recruiter, threshold);
+
           try {
             await resend.emails.send({
               from: "Escoger Recruitment <onboarding@resend.dev>",
               to: [recruiter.email],
-              subject: `🎯 ${highScoreCandidates.length} High-Scoring Candidate${highScoreCandidates.length > 1 ? 's' : ''} Found!`,
-              html: `
-                <!DOCTYPE html>
-                <html>
-                <head>
-                  <style>
-                    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
-                    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-                    .header { background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); color: white; padding: 30px; border-radius: 8px 8px 0 0; text-align: center; }
-                    .content { background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px; }
-                    .candidate-list { background: white; border-radius: 8px; padding: 20px; margin: 15px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-                    .candidate-item { padding: 12px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
-                    .candidate-item:last-child { border-bottom: none; }
-                    .score-badge { background: #10b981; color: white; padding: 4px 12px; border-radius: 20px; font-weight: 600; }
-                    .footer { text-align: center; margin-top: 30px; color: #666; font-size: 14px; }
-                  </style>
-                </head>
-                <body>
-                  <div class="container">
-                    <div class="header">
-                      <h1>🎯 New High-Scoring Candidates!</h1>
-                      <p>We found ${highScoreCandidates.length} candidate${highScoreCandidates.length > 1 ? 's' : ''} matching ≥${threshold}%</p>
-                    </div>
-                    
-                    <div class="content">
-                      <p>Hi${recruiter.full_name ? ` ${recruiter.full_name}` : ''},</p>
-                      <p>Great news! Our AI matching system has identified the following high-scoring candidates:</p>
-                      
-                      <div class="candidate-list">
-                        ${highScoreCandidates.map(c => `
-                          <div class="candidate-item">
-                            <div>
-                              <strong>${c.name}</strong>
-                              <div style="color: #666; font-size: 14px;">${c.jobRole}</div>
-                            </div>
-                            <span class="score-badge">${c.score}%</span>
-                          </div>
-                        `).join('')}
-                      </div>
-
-                      <p style="text-align: center; margin: 25px 0;">
-                        Log in to Escoger to review these candidates and take the next steps in the hiring process.
-                      </p>
-
-                      <div class="footer">
-                        <p style="margin-top: 20px; font-size: 12px;">
-                          This is an automated notification from Escoger's AI-powered recruitment system.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </body>
-                </html>
-              `,
+              subject: subject,
+              html: html,
             });
             recruiterNotificationsSent++;
             console.log(`Recruiter notification sent to ${recruiter.email}`);
+            
+            // Log successful notification
+            await logNotification(
+              supabase,
+              'recruiter_alert',
+              recruiter.email,
+              recruiter.full_name,
+              subject,
+              'sent',
+              undefined,
+              { candidates_count: highScoreCandidates.length, threshold }
+            );
           } catch (emailError) {
+            const errorMsg = emailError instanceof Error ? emailError.message : 'Unknown error';
             console.error(`Failed to send recruiter notification to ${recruiter.email}:`, emailError);
+            
+            // Log failed notification
+            await logNotification(
+              supabase,
+              'recruiter_alert',
+              recruiter.email,
+              recruiter.full_name,
+              subject,
+              'failed',
+              errorMsg,
+              { candidates_count: highScoreCandidates.length, threshold }
+            );
           }
         }
       }
@@ -414,3 +449,88 @@ Evaluate the candidate's fit for this specific role and provide match scores.`;
     });
   }
 });
+
+// Default HTML templates (used when custom templates not available)
+function getDefaultCandidateHtml(candidate: { name: string; score: number; jobRole: string }): string {
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 30px; border-radius: 8px 8px 0 0; text-align: center; }
+    .content { background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px; }
+    .score-card { background: white; border-radius: 8px; padding: 20px; margin: 15px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center; }
+    .score { font-size: 64px; font-weight: bold; color: #10b981; margin: 10px 0; }
+    .footer { text-align: center; margin-top: 30px; color: #666; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🎉 Congratulations, ${candidate.name}!</h1>
+      <p>You're an excellent match for the ${candidate.jobRole} position!</p>
+    </div>
+    <div class="content">
+      <div class="score-card">
+        <h2 style="color: #333; margin-bottom: 5px;">Your Match Score</h2>
+        <div class="score">${candidate.score}%</div>
+        <p style="color: #10b981; font-weight: 600;">${candidate.score >= 90 ? 'Outstanding Match!' : 'Strong Match!'}</p>
+      </div>
+      <p style="text-align: center; margin: 25px 0;">Based on our AI-powered analysis, your skills and experience align exceptionally well with this role. Our recruitment team will be in touch with you shortly to discuss the next steps.</p>
+      <div class="footer">
+        <p>Thank you for your interest in joining our team!</p>
+        <p style="margin-top: 20px; font-size: 12px;">This is an automated notification from Escoger's AI-powered recruitment system.</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
+function getDefaultRecruiterHtml(
+  candidates: Array<{ name: string; score: number; jobRole: string }>,
+  recruiter: { email: string; full_name: string | null },
+  threshold: number
+): string {
+  const candidateItems = candidates.map(c => `
+    <div class="candidate-item">
+      <div><strong>${c.name}</strong><div style="color: #666; font-size: 14px;">${c.jobRole}</div></div>
+      <span class="score-badge">${c.score}%</span>
+    </div>
+  `).join('');
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); color: white; padding: 30px; border-radius: 8px 8px 0 0; text-align: center; }
+    .content { background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px; }
+    .candidate-list { background: white; border-radius: 8px; padding: 20px; margin: 15px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .candidate-item { padding: 12px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+    .candidate-item:last-child { border-bottom: none; }
+    .score-badge { background: #10b981; color: white; padding: 4px 12px; border-radius: 20px; font-weight: 600; }
+    .footer { text-align: center; margin-top: 30px; color: #666; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🎯 New High-Scoring Candidates!</h1>
+      <p>We found ${candidates.length} candidate${candidates.length > 1 ? 's' : ''} matching ≥${threshold}%</p>
+    </div>
+    <div class="content">
+      <p>Hi${recruiter.full_name ? ` ${recruiter.full_name}` : ''},</p>
+      <p>Great news! Our AI matching system has identified the following high-scoring candidates:</p>
+      <div class="candidate-list">${candidateItems}</div>
+      <p style="text-align: center; margin: 25px 0;">Log in to Escoger to review these candidates and take the next steps in the hiring process.</p>
+      <div class="footer">
+        <p style="margin-top: 20px; font-size: 12px;">This is an automated notification from Escoger's AI-powered recruitment system.</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+}

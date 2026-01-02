@@ -277,6 +277,42 @@ export type Database = {
           },
         ]
       }
+      email_templates: {
+        Row: {
+          created_at: string
+          description: string | null
+          html_template: string
+          id: string
+          is_active: boolean
+          subject_template: string
+          template_key: string
+          template_name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          html_template: string
+          id?: string
+          is_active?: boolean
+          subject_template: string
+          template_key: string
+          template_name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          html_template?: string
+          id?: string
+          is_active?: boolean
+          subject_template?: string
+          template_key?: string
+          template_name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       interview_questions: {
         Row: {
           application_id: string
@@ -345,6 +381,42 @@ export type Database = {
           required_skills?: string[] | null
           requirements?: Json
           updated_at?: string
+        }
+        Relationships: []
+      }
+      notification_history: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          id: string
+          metadata: Json | null
+          notification_type: string
+          recipient_email: string
+          recipient_name: string | null
+          status: string
+          subject: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          metadata?: Json | null
+          notification_type: string
+          recipient_email: string
+          recipient_name?: string | null
+          status?: string
+          subject: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          metadata?: Json | null
+          notification_type?: string
+          recipient_email?: string
+          recipient_name?: string | null
+          status?: string
+          subject?: string
         }
         Relationships: []
       }

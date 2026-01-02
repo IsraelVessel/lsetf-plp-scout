@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import Header from "@/components/Header";
+import NotificationHistory from "@/components/NotificationHistory";
+import EmailTemplateEditor from "@/components/EmailTemplateEditor";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
 import { Clock, TrendingUp, Award, Bell, Save, Loader2 } from "lucide-react";
@@ -355,6 +357,12 @@ const AdminDashboard = () => {
               </ResponsiveContainer>
             </CardContent>
           </Card>
+        </div>
+
+        {/* Email Templates and Notification History */}
+        <div className="grid md:grid-cols-2 gap-8 mb-8">
+          <EmailTemplateEditor />
+          <NotificationHistory />
         </div>
       </section>
     </div>
