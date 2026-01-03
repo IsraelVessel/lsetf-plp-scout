@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Users, TrendingUp, Database, LogOut, FolderUp, BarChart3, LayoutGrid, Target } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import escogerLogo from "@/assets/venia-logo.png";
+import escogerLogo from "@/assets/escoger-logo.jpeg";
 import { useQuery } from "@tanstack/react-query";
 
 const Header = () => {
