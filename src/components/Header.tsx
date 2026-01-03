@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import escogerLogo from "@/assets/escoger-logo.jpeg";
 import { useQuery } from "@tanstack/react-query";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const Header = () => {
   const navigate = useNavigate();
@@ -115,10 +116,13 @@ const Header = () => {
             </Link>
           )}
         </nav>
-        <Button variant="ghost" size="sm" onClick={handleSignOut} className="gap-2">
-          <LogOut className="w-4 h-4" />
-          Sign Out
-        </Button>
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          <Button variant="ghost" size="sm" onClick={handleSignOut} className="gap-2">
+            <LogOut className="w-4 h-4" />
+            Sign Out
+          </Button>
+        </div>
       </div>
     </header>
   );
