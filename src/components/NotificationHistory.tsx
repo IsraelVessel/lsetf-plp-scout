@@ -1,10 +1,13 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Mail, CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { Mail, CheckCircle, XCircle, Loader2, RefreshCw } from "lucide-react";
 import { format } from "date-fns";
+import { useEffect } from "react";
+import { toast } from "sonner";
 
 interface NotificationRecord {
   id: string;
@@ -16,9 +19,15 @@ interface NotificationRecord {
   error_message: string | null;
   metadata: Record<string, unknown>;
   created_at: string;
+  retry_count: number;
+  last_retry_at: string | null;
 }
 
+const MAX_RETRIES = 3;
+
 const NotificationHistory = () => {
+  const queryClient = useQueryClient();
+
   const { data: notifications, isLoading } = useQuery({
     queryKey: ['notification-history'],
     queryFn: async () => {
@@ -30,6 +39,47 @@ const NotificationHistory = () => {
       
       if (error) throw error;
       return data as NotificationRecord[];
+    }
+  });
+
+  // Real-time subscription for notification updates
+  useEffect(() => {
+    const channel = supabase
+      .channel('notification-history-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notification_history'
+        },
+        (payload) => {
+          console.log('Notification history updated:', payload);
+          queryClient.invalidateQueries({ queryKey: ['notification-history'] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
+
+  const retryMutation = useMutation({
+    mutationFn: async (notificationId: string) => {
+      const { data, error } = await supabase.functions.invoke('retry-notification', {
+        body: { notificationId }
+      });
+      
+      if (error) throw error;
+      if (!data.success) throw new Error(data.message || 'Retry failed');
+      return data;
+    },
+    onSuccess: () => {
+      toast.success('Email resent successfully');
+    },
+    onError: (error: Error) => {
+      toast.error(`Retry failed: ${error.message}`);
     }
   });
 
@@ -68,7 +118,7 @@ const NotificationHistory = () => {
           <CardTitle>Notification History</CardTitle>
         </div>
         <CardDescription>
-          Recent email notifications sent by the system
+          Recent email notifications sent by the system (updates in real-time)
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -81,18 +131,26 @@ const NotificationHistory = () => {
             <div className="space-y-3">
               {notifications.map((notification) => {
                 const typeInfo = getTypeLabel(notification.notification_type);
+                const canRetry = notification.status === 'failed' && notification.retry_count < MAX_RETRIES;
+                const isRetrying = retryMutation.isPending && retryMutation.variables === notification.id;
+                
                 return (
                   <div
                     key={notification.id}
                     className="flex items-start justify-between p-4 border rounded-lg bg-card hover:bg-muted/50 transition-colors"
                   >
                     <div className="flex-1 min-w-0 space-y-1">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <Badge variant={typeInfo.variant}>{typeInfo.label}</Badge>
                         {notification.status === 'sent' ? (
                           <CheckCircle className="h-4 w-4 text-green-500" />
                         ) : (
                           <XCircle className="h-4 w-4 text-destructive" />
+                        )}
+                        {notification.retry_count > 0 && (
+                          <Badge variant="outline" className="text-xs">
+                            Retries: {notification.retry_count}/{MAX_RETRIES}
+                          </Badge>
                         )}
                       </div>
                       <p className="font-medium truncate">{notification.subject}</p>
@@ -103,8 +161,26 @@ const NotificationHistory = () => {
                         <p className="text-sm text-destructive">{notification.error_message}</p>
                       )}
                     </div>
-                    <div className="text-xs text-muted-foreground whitespace-nowrap ml-4">
-                      {format(new Date(notification.created_at), 'MMM d, HH:mm')}
+                    <div className="flex flex-col items-end gap-2 ml-4">
+                      <div className="text-xs text-muted-foreground whitespace-nowrap">
+                        {format(new Date(notification.created_at), 'MMM d, HH:mm')}
+                      </div>
+                      {canRetry && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => retryMutation.mutate(notification.id)}
+                          disabled={isRetrying}
+                          className="h-7 text-xs"
+                        >
+                          {isRetrying ? (
+                            <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                          ) : (
+                            <RefreshCw className="h-3 w-3 mr-1" />
+                          )}
+                          Retry
+                        </Button>
+                      )}
                     </div>
                   </div>
                 );
