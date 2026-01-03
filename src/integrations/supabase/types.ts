@@ -389,10 +389,12 @@ export type Database = {
           created_at: string
           error_message: string | null
           id: string
+          last_retry_at: string | null
           metadata: Json | null
           notification_type: string
           recipient_email: string
           recipient_name: string | null
+          retry_count: number | null
           status: string
           subject: string
         }
@@ -400,10 +402,12 @@ export type Database = {
           created_at?: string
           error_message?: string | null
           id?: string
+          last_retry_at?: string | null
           metadata?: Json | null
           notification_type: string
           recipient_email: string
           recipient_name?: string | null
+          retry_count?: number | null
           status?: string
           subject: string
         }
@@ -411,10 +415,12 @@ export type Database = {
           created_at?: string
           error_message?: string | null
           id?: string
+          last_retry_at?: string | null
           metadata?: Json | null
           notification_type?: string
           recipient_email?: string
           recipient_name?: string | null
+          retry_count?: number | null
           status?: string
           subject?: string
         }
