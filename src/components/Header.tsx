@@ -1,6 +1,6 @@
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Users, TrendingUp, Database, LogOut, FolderUp, BarChart3, LayoutGrid, Target } from "lucide-react";
+import { Users, TrendingUp, Database, LogOut, FolderUp, BarChart3, LayoutGrid, Target, Settings } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import escogerLogo from "@/assets/escoger-logo.jpeg";
@@ -118,6 +118,12 @@ const Header = () => {
         </nav>
         <div className="flex items-center gap-2">
           <ThemeToggle />
+          <Link to="/profile">
+            <Button variant="ghost" size="icon" className="h-9 w-9">
+              <Settings className="h-4 w-4" />
+              <span className="sr-only">Profile Settings</span>
+            </Button>
+          </Link>
           <Button variant="ghost" size="sm" onClick={handleSignOut} className="gap-2">
             <LogOut className="w-4 h-4" />
             Sign Out
