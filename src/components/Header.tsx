@@ -1,6 +1,6 @@
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Users, TrendingUp, Database, LogOut, FolderUp, BarChart3, LayoutGrid, Target, Settings } from "lucide-react";
+import { Users, TrendingUp, Database, LogOut, FolderUp, BarChart3, LayoutGrid, Target, Settings, UserCog } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import escogerLogo from "@/assets/escoger-logo.jpeg";
@@ -112,6 +112,17 @@ const Header = () => {
               >
                 <BarChart3 className="w-4 h-4" />
                 Analytics
+              </Button>
+            </Link>
+          )}
+          {userRole === 'admin' && (
+            <Link to="/admin-panel">
+              <Button 
+                variant={isActive("/admin-panel") ? "default" : "ghost"}
+                className="gap-2"
+              >
+                <UserCog className="w-4 h-4" />
+                Admin
               </Button>
             </Link>
           )}

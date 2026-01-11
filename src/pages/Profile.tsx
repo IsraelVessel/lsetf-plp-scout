@@ -6,18 +6,24 @@ import { useToast } from "@/hooks/use-toast";
 import Header from "@/components/Header";
 import PasswordChangeSection from "@/components/PasswordChangeSection";
 import ActivityLogSection from "@/components/ActivityLogSection";
+import TwoFactorSection from "@/components/TwoFactorSection";
+import EmailPreferencesSection from "@/components/EmailPreferencesSection";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Camera, Loader2, Save, User } from "lucide-react";
 
 interface UserPreferences {
   emailNotifications?: boolean;
   darkMode?: boolean;
+  newCandidates?: boolean;
+  statusChanges?: boolean;
+  interviewReminders?: boolean;
+  weeklyDigest?: boolean;
+  systemAlerts?: boolean;
 }
 
 const Profile = () => {
@@ -232,47 +238,6 @@ const Profile = () => {
             </CardContent>
           </Card>
 
-          {/* Preferences */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Preferences</CardTitle>
-              <CardDescription>
-                Customize your experience
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Email Notifications</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Receive email notifications about candidate updates
-                  </p>
-                </div>
-                <Switch 
-                  checked={preferences.emailNotifications}
-                  onCheckedChange={(checked) => 
-                    setPreferences(prev => ({ ...prev, emailNotifications: checked }))
-                  }
-                />
-              </div>
-              <Separator />
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Dark Mode Preference</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Save your dark mode preference to your profile
-                  </p>
-                </div>
-                <Switch 
-                  checked={preferences.darkMode}
-                  onCheckedChange={(checked) => 
-                    setPreferences(prev => ({ ...prev, darkMode: checked }))
-                  }
-                />
-              </div>
-            </CardContent>
-          </Card>
-
           {/* Save Button */}
           <Button 
             onClick={() => updateProfileMutation.mutate()}
@@ -292,6 +257,12 @@ const Profile = () => {
               </>
             )}
           </Button>
+
+          {/* Email Notification Preferences */}
+          <EmailPreferencesSection />
+
+          {/* Two-Factor Authentication */}
+          <TwoFactorSection />
 
           {/* Password Change Section */}
           <PasswordChangeSection />
