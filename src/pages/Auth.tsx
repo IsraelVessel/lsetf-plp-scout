@@ -186,7 +186,7 @@ const Auth = () => {
                   )}
                 </Button>
                 <p className="text-xs text-muted-foreground text-center">
-                  Note: After creating an account, contact admin to assign staff role.
+                  ✓ Staff access is automatically granted upon signup
                 </p>
               </form>
             </TabsContent>
