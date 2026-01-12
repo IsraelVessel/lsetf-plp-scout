@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { supabase } from "@/integrations/supabase/client";
 import Header from "@/components/Header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 
 const Dashboard = () => {
+  const { t } = useTranslation();
   const [stats, setStats] = useState({
     totalCandidates: 0,
     totalApplications: 0,
@@ -69,28 +71,28 @@ const Dashboard = () => {
         <div className="container relative">
           <div className="max-w-3xl mx-auto text-center space-y-6">
             <h1 className="text-5xl font-bold tracking-tight">
-              AI-Powered Candidate Selection
+              {t("dashboard.heroTitle")}
             </h1>
             <p className="text-xl text-muted-foreground">
-              Intelligent analysis for candidate selection. Upload multiple resumes at once, get instant detailed AI rankings capturing every detail from CVs, and identify top talents.
+              {t("dashboard.heroDescription")}
             </p>
             <div className="flex gap-4 justify-center pt-4">
               <Link to="/batch-upload">
                 <Button size="lg" className="gap-2">
                   <Users className="w-5 h-5" />
-                  Batch Upload
+                  {t("nav.batchUpload")}
                 </Button>
               </Link>
               <Link to="/upload">
                 <Button size="lg" variant="outline" className="gap-2">
                   <Users className="w-5 h-5" />
-                  Single Upload
+                  {t("nav.singleUpload")}
                 </Button>
               </Link>
               <Link to="/rankings">
                 <Button size="lg" variant="outline" className="gap-2">
                   <TrendingUp className="w-5 h-5" />
-                  View Rankings
+                  {t("dashboard.viewRankings")}
                 </Button>
               </Link>
             </div>
@@ -103,52 +105,52 @@ const Dashboard = () => {
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
           <Card className="transition-all duration-300 hover:shadow-[var(--shadow-elegant)]">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Candidates</CardTitle>
+              <CardTitle className="text-sm font-medium">{t("dashboard.totalCandidates")}</CardTitle>
               <Users className="h-4 w-4 text-primary" />
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold">{stats.totalCandidates}</div>
               <p className="text-xs text-muted-foreground mt-1">
-                Registered in system
+                {t("dashboard.registeredInSystem")}
               </p>
             </CardContent>
           </Card>
 
           <Card className="transition-all duration-300 hover:shadow-[var(--shadow-elegant)]">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Applications</CardTitle>
+              <CardTitle className="text-sm font-medium">{t("dashboard.applications")}</CardTitle>
               <FileText className="h-4 w-4 text-primary" />
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold">{stats.totalApplications}</div>
               <p className="text-xs text-muted-foreground mt-1">
-                Total submissions
+                {t("dashboard.totalSubmissions")}
               </p>
             </CardContent>
           </Card>
 
           <Card className="transition-all duration-300 hover:shadow-[var(--shadow-elegant)]">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">AI Analyzed</CardTitle>
+              <CardTitle className="text-sm font-medium">{t("dashboard.aiAnalyzed")}</CardTitle>
               <Brain className="h-4 w-4 text-secondary" />
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold">{stats.analyzedApplications}</div>
               <p className="text-xs text-muted-foreground mt-1">
-                Processed by AI
+                {t("dashboard.processedByAI")}
               </p>
             </CardContent>
           </Card>
 
           <Card className="transition-all duration-300 hover:shadow-[var(--shadow-elegant)]">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Average Score</CardTitle>
+              <CardTitle className="text-sm font-medium">{t("dashboard.averageScore")}</CardTitle>
               <TrendingUp className="h-4 w-4 text-secondary" />
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold">{stats.averageScore}</div>
               <p className="text-xs text-muted-foreground mt-1">
-                Out of 100
+                {t("dashboard.outOf100")}
               </p>
             </CardContent>
           </Card>
@@ -158,9 +160,9 @@ const Dashboard = () => {
       {/* Features Section */}
       <section className="container py-16">
         <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold mb-4">Powerful AI Analysis</h2>
+          <h2 className="text-3xl font-bold mb-4">{t("dashboard.featuresTitle")}</h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            Our platform uses advanced machine learning to evaluate candidates comprehensively
+            {t("dashboard.featuresDescription")}
           </p>
         </div>
         
@@ -168,9 +170,9 @@ const Dashboard = () => {
           <Card>
             <CardHeader>
               <Brain className="w-12 h-12 text-primary mb-4" />
-              <CardTitle>Smart Ranking</CardTitle>
+              <CardTitle>{t("dashboard.smartRanking")}</CardTitle>
               <CardDescription>
-                AI evaluates skills, experience, and education to rank candidates objectively
+                {t("dashboard.smartRankingDesc")}
               </CardDescription>
             </CardHeader>
           </Card>
@@ -178,9 +180,9 @@ const Dashboard = () => {
           <Card>
             <CardHeader>
               <Users className="w-12 h-12 text-primary mb-4" />
-              <CardTitle>Batch Processing</CardTitle>
+              <CardTitle>{t("dashboard.batchProcessing")}</CardTitle>
               <CardDescription>
-                Upload multiple resumes at once and get instant AI-powered analysis
+                {t("dashboard.batchProcessingDesc")}
               </CardDescription>
             </CardHeader>
           </Card>
@@ -188,9 +190,9 @@ const Dashboard = () => {
           <Card>
             <CardHeader>
               <TrendingUp className="w-12 h-12 text-secondary mb-4" />
-              <CardTitle>Program Integration</CardTitle>
+              <CardTitle>{t("dashboard.programIntegration")}</CardTitle>
               <CardDescription>
-                Seamlessly connect with Escoger's upskilling platform for program matching
+                {t("dashboard.programIntegrationDesc")}
               </CardDescription>
             </CardHeader>
           </Card>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -13,7 +14,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Separator } from "@/components/ui/separator";
 import { Camera, Loader2, Save, User } from "lucide-react";
 
 interface UserPreferences {
@@ -29,6 +29,7 @@ interface UserPreferences {
 const Profile = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   
   const [fullName, setFullName] = useState("");
@@ -74,7 +75,6 @@ const Profile = () => {
 
       let avatarUrl = profile?.avatar_url;
 
-      // Upload avatar if changed
       if (avatarFile) {
         setIsUploading(true);
         const fileExt = avatarFile.name.split('.').pop();
@@ -109,13 +109,13 @@ const Profile = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['profile'] });
       toast({
-        title: "Profile updated",
-        description: "Your profile has been updated successfully.",
+        title: t("common.success"),
+        description: t("profile.profileUpdated"),
       });
     },
     onError: (error) => {
       toast({
-        title: "Error",
+        title: t("common.error"),
         description: error.message,
         variant: "destructive",
       });
@@ -155,8 +155,8 @@ const Profile = () => {
       <Header />
       <main className="container py-8 max-w-2xl">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground">Profile Settings</h1>
-          <p className="text-muted-foreground mt-2">Manage your account settings and preferences</p>
+          <h1 className="text-3xl font-bold text-foreground">{t("profile.title")}</h1>
+          <p className="text-muted-foreground mt-2">{t("profile.description")}</p>
         </div>
 
         <div className="space-y-6">
@@ -165,10 +165,10 @@ const Profile = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <User className="h-5 w-5" />
-                Profile Picture
+                {t("profile.profilePicture")}
               </CardTitle>
               <CardDescription>
-                Upload a profile picture to personalize your account
+                {t("profile.clickToUpload")}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -196,7 +196,7 @@ const Profile = () => {
                 </div>
                 <div className="flex-1">
                   <p className="text-sm text-muted-foreground">
-                    Click the camera icon to upload a new profile picture.
+                    {t("profile.clickToUpload")}
                     <br />
                     Recommended size: 200x200 pixels.
                   </p>
@@ -208,14 +208,14 @@ const Profile = () => {
           {/* Personal Information */}
           <Card>
             <CardHeader>
-              <CardTitle>Personal Information</CardTitle>
+              <CardTitle>{t("profile.fullName")}</CardTitle>
               <CardDescription>
-                Update your personal details
+                {t("profile.description")}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">{t("profile.email")}</Label>
                 <Input 
                   id="email" 
                   value={profile?.email || ""} 
@@ -223,16 +223,16 @@ const Profile = () => {
                   className="bg-muted"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Email cannot be changed
+                  {t("profile.emailReadOnly")}
                 </p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="fullName">Full Name</Label>
+                <Label htmlFor="fullName">{t("profile.fullName")}</Label>
                 <Input 
                   id="fullName" 
                   value={fullName} 
                   onChange={(e) => setFullName(e.target.value)}
-                  placeholder="Enter your full name"
+                  placeholder={t("profile.enterFullName")}
                 />
               </div>
             </CardContent>
@@ -248,12 +248,12 @@ const Profile = () => {
             {updateProfileMutation.isPending || isUploading ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Saving...
+                {t("profile.saving")}
               </>
             ) : (
               <>
                 <Save className="h-4 w-4 mr-2" />
-                Save Changes
+                {t("profile.saveChanges")}
               </>
             )}
           </Button>
