@@ -1,4 +1,5 @@
 import { Link, useNavigate, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Users, TrendingUp, Database, LogOut, FolderUp, BarChart3, LayoutGrid, Target, Settings, UserCog } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -6,11 +7,13 @@ import { useToast } from "@/hooks/use-toast";
 import escogerLogo from "@/assets/escoger-logo.jpeg";
 import { useQuery } from "@tanstack/react-query";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 const Header = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const location = useLocation();
+  const { t } = useTranslation();
 
   const { data: userRole } = useQuery({
     queryKey: ['userRole'],
@@ -31,8 +34,8 @@ const Header = () => {
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     toast({
-      title: "Signed out",
-      description: "You have been signed out successfully.",
+      title: t("auth.signOut"),
+      description: t("auth.signOutSuccess"),
     });
     navigate("/auth");
   };
@@ -45,7 +48,7 @@ const Header = () => {
         <Link to="/" className="flex items-center space-x-2 mr-8">
           <img src={escogerLogo} alt="Escoger Logo" className="w-10 h-10 rounded-lg" />
           <span className="font-bold text-xl bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary">
-            Escoger
+            {t("common.appName")}
           </span>
         </Link>
         
@@ -56,7 +59,7 @@ const Header = () => {
               className="gap-2"
             >
               <Database className="w-4 h-4" />
-              Dashboard
+              {t("nav.dashboard")}
             </Button>
           </Link>
           <Link to="/upload">
@@ -65,7 +68,7 @@ const Header = () => {
               className="gap-2"
             >
               <Users className="w-4 h-4" />
-              Single Upload
+              {t("nav.singleUpload")}
             </Button>
           </Link>
           <Link to="/batch-upload">
@@ -74,7 +77,7 @@ const Header = () => {
               className="gap-2"
             >
               <FolderUp className="w-4 h-4" />
-              Batch Upload
+              {t("nav.batchUpload")}
             </Button>
           </Link>
           <Link to="/rankings">
@@ -83,7 +86,7 @@ const Header = () => {
               className="gap-2"
             >
               <TrendingUp className="w-4 h-4" />
-              Rankings
+              {t("nav.rankings")}
             </Button>
           </Link>
           <Link to="/kanban">
@@ -92,7 +95,7 @@ const Header = () => {
               className="gap-2"
             >
               <LayoutGrid className="w-4 h-4" />
-              Kanban
+              {t("nav.kanban")}
             </Button>
           </Link>
           <Link to="/job-requirements">
@@ -101,7 +104,7 @@ const Header = () => {
               className="gap-2"
             >
               <Target className="w-4 h-4" />
-              Job Matching
+              {t("nav.jobMatching")}
             </Button>
           </Link>
           {userRole && (userRole === 'admin' || userRole === 'recruiter') && (
@@ -111,7 +114,7 @@ const Header = () => {
                 className="gap-2"
               >
                 <BarChart3 className="w-4 h-4" />
-                Analytics
+                {t("nav.analytics")}
               </Button>
             </Link>
           )}
@@ -122,22 +125,23 @@ const Header = () => {
                 className="gap-2"
               >
                 <UserCog className="w-4 h-4" />
-                Admin
+                {t("nav.admin")}
               </Button>
             </Link>
           )}
         </nav>
         <div className="flex items-center gap-2">
+          <LanguageSwitcher />
           <ThemeToggle />
           <Link to="/profile">
             <Button variant="ghost" size="icon" className="h-9 w-9">
               <Settings className="h-4 w-4" />
-              <span className="sr-only">Profile Settings</span>
+              <span className="sr-only">{t("nav.profile")}</span>
             </Button>
           </Link>
           <Button variant="ghost" size="sm" onClick={handleSignOut} className="gap-2">
             <LogOut className="w-4 h-4" />
-            Sign Out
+            {t("auth.signOut")}
           </Button>
         </div>
       </div>
