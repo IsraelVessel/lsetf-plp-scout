@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Key, Loader2, Eye, EyeOff } from "lucide-react";
 
 const PasswordChangeSection = () => {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -20,8 +22,8 @@ const PasswordChangeSection = () => {
   const handlePasswordChange = async () => {
     if (newPassword !== confirmPassword) {
       toast({
-        title: "Error",
-        description: "New passwords do not match",
+        title: t("common.error"),
+        description: t("password.mismatch"),
         variant: "destructive",
       });
       return;
@@ -29,8 +31,8 @@ const PasswordChangeSection = () => {
 
     if (newPassword.length < 6) {
       toast({
-        title: "Error",
-        description: "Password must be at least 6 characters",
+        title: t("common.error"),
+        description: t("password.minLength"),
         variant: "destructive",
       });
       return;
@@ -56,8 +58,8 @@ const PasswordChangeSection = () => {
       }
 
       toast({
-        title: "Success",
-        description: "Password changed successfully",
+        title: t("common.success"),
+        description: t("password.success"),
       });
 
       setCurrentPassword("");
@@ -65,7 +67,7 @@ const PasswordChangeSection = () => {
       setConfirmPassword("");
     } catch (error: any) {
       toast({
-        title: "Error",
+        title: t("common.error"),
         description: error.message,
         variant: "destructive",
       });
@@ -79,22 +81,22 @@ const PasswordChangeSection = () => {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Key className="h-5 w-5" />
-          Change Password
+          {t("password.title")}
         </CardTitle>
         <CardDescription>
-          Update your password to keep your account secure
+          {t("password.description")}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="currentPassword">Current Password</Label>
+          <Label htmlFor="currentPassword">{t("password.currentPassword")}</Label>
           <div className="relative">
             <Input
               id="currentPassword"
               type={showCurrentPassword ? "text" : "password"}
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
-              placeholder="Enter current password"
+              placeholder={t("password.currentPasswordPlaceholder")}
             />
             <Button
               type="button"
@@ -112,14 +114,14 @@ const PasswordChangeSection = () => {
           </div>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="newPassword">New Password</Label>
+          <Label htmlFor="newPassword">{t("password.newPassword")}</Label>
           <div className="relative">
             <Input
               id="newPassword"
               type={showNewPassword ? "text" : "password"}
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="Enter new password"
+              placeholder={t("password.newPasswordPlaceholder")}
               minLength={6}
             />
             <Button
@@ -138,14 +140,14 @@ const PasswordChangeSection = () => {
           </div>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="confirmPassword">Confirm New Password</Label>
+          <Label htmlFor="confirmPassword">{t("password.confirmPassword")}</Label>
           <div className="relative">
             <Input
               id="confirmPassword"
               type={showConfirmPassword ? "text" : "password"}
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Confirm new password"
+              placeholder={t("password.confirmPasswordPlaceholder")}
               minLength={6}
             />
             <Button
@@ -171,10 +173,10 @@ const PasswordChangeSection = () => {
           {isChanging ? (
             <>
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Changing Password...
+              {t("password.changing")}
             </>
           ) : (
-            "Change Password"
+            t("password.changePassword")
           )}
         </Button>
       </CardContent>
