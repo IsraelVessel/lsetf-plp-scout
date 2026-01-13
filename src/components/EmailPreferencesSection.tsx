@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,7 @@ interface EmailPreferencesSectionProps {
 }
 
 const EmailPreferencesSection = ({ initialPreferences, onSave }: EmailPreferencesSectionProps) => {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -113,12 +115,12 @@ const EmailPreferencesSection = ({ initialPreferences, onSave }: EmailPreference
       }
 
       toast({
-        title: "Preferences Saved",
-        description: "Your email notification preferences have been updated.",
+        title: t("emailPreferences.savedTitle"),
+        description: t("emailPreferences.saved"),
       });
     } catch (err: any) {
       toast({
-        title: "Error",
+        title: t("common.error"),
         description: err.message,
         variant: "destructive",
       });
@@ -130,32 +132,32 @@ const EmailPreferencesSection = ({ initialPreferences, onSave }: EmailPreference
   const preferenceItems = [
     {
       key: "newCandidates",
-      label: "New Candidates",
-      description: "Get notified when new candidates apply",
+      label: t("emailPreferences.newCandidates"),
+      description: t("emailPreferences.newCandidatesDesc"),
       icon: UserPlus,
     },
     {
       key: "statusChanges",
-      label: "Status Changes",
-      description: "Get notified when candidate statuses change",
+      label: t("emailPreferences.statusChanges"),
+      description: t("emailPreferences.statusChangesDesc"),
       icon: RefreshCw,
     },
     {
       key: "interviewReminders",
-      label: "Interview Reminders",
-      description: "Receive reminders for scheduled interviews",
+      label: t("emailPreferences.interviewReminders"),
+      description: t("emailPreferences.interviewRemindersDesc"),
       icon: Calendar,
     },
     {
       key: "weeklyDigest",
-      label: "Weekly Digest",
-      description: "Receive a weekly summary of hiring activity",
+      label: t("emailPreferences.weeklyDigest"),
+      description: t("emailPreferences.weeklyDigestDesc"),
       icon: CheckCircle,
     },
     {
       key: "systemAlerts",
-      label: "System Alerts",
-      description: "Important system notifications and updates",
+      label: t("emailPreferences.systemAlerts"),
+      description: t("emailPreferences.systemAlertsDesc"),
       icon: AlertCircle,
     },
   ];
@@ -175,10 +177,10 @@ const EmailPreferencesSection = ({ initialPreferences, onSave }: EmailPreference
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Bell className="h-5 w-5" />
-          Email Notifications
+          {t("emailPreferences.title")}
         </CardTitle>
         <CardDescription>
-          Choose which email notifications you'd like to receive
+          {t("emailPreferences.description")}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -212,12 +214,12 @@ const EmailPreferencesSection = ({ initialPreferences, onSave }: EmailPreference
           {isSaving ? (
             <>
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Saving...
+              {t("emailPreferences.saving")}
             </>
           ) : (
             <>
               <Save className="h-4 w-4 mr-2" />
-              Save Preferences
+              {t("emailPreferences.savePreferences")}
             </>
           )}
         </Button>

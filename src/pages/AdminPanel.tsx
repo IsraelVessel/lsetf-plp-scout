@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -27,6 +28,7 @@ interface UserWithRole {
 }
 
 const AdminPanel = () => {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -121,13 +123,13 @@ const AdminPanel = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["adminUsers"] });
       toast({
-        title: "Role Updated",
-        description: "User role has been updated successfully.",
+        title: t("adminPanel.roleUpdatedTitle"),
+        description: t("adminPanel.roleUpdated"),
       });
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
+        title: t("common.error"),
         description: error.message,
         variant: "destructive",
       });
@@ -179,11 +181,11 @@ const AdminPanel = () => {
           <Alert variant="destructive">
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>
-              You don't have permission to access this page. Admin access required.
+              {t("adminPanel.accessDenied")}
             </AlertDescription>
           </Alert>
           <Button onClick={() => navigate("/")} className="mt-4">
-            Go to Dashboard
+            {t("adminPanel.goToDashboard")}
           </Button>
         </main>
       </div>
@@ -197,10 +199,10 @@ const AdminPanel = () => {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
             <UserCog className="h-8 w-8" />
-            Admin Panel
+            {t("adminPanel.title")}
           </h1>
           <p className="text-muted-foreground mt-2">
-            Manage user roles and permissions
+            {t("adminPanel.description")}
           </p>
         </div>
 
@@ -208,7 +210,7 @@ const AdminPanel = () => {
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Total Users
+                {t("adminPanel.totalUsers")}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -221,7 +223,7 @@ const AdminPanel = () => {
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Admins
+                {t("adminPanel.admins")}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -236,7 +238,7 @@ const AdminPanel = () => {
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Recruiters
+                {t("adminPanel.recruiters")}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -252,9 +254,9 @@ const AdminPanel = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle>User Management</CardTitle>
+            <CardTitle>{t("adminPanel.userManagement")}</CardTitle>
             <CardDescription>
-              View and manage user roles across the platform
+              {t("adminPanel.userManagementDesc")}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -262,7 +264,7 @@ const AdminPanel = () => {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search users by name or email..."
+                  placeholder={t("adminPanel.searchPlaceholder")}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10"
@@ -279,11 +281,11 @@ const AdminPanel = () => {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>User</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Current Role</TableHead>
-                      <TableHead>Joined</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead>{t("adminPanel.tableUser")}</TableHead>
+                      <TableHead>{t("adminPanel.tableEmail")}</TableHead>
+                      <TableHead>{t("adminPanel.tableRole")}</TableHead>
+                      <TableHead>{t("adminPanel.tableJoined")}</TableHead>
+                      <TableHead className="text-right">{t("adminPanel.tableActions")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -298,7 +300,7 @@ const AdminPanel = () => {
                               </AvatarFallback>
                             </Avatar>
                             <span className="font-medium">
-                              {user.full_name || "No name"}
+                              {user.full_name || t("adminPanel.noName")}
                             </span>
                           </div>
                         </TableCell>
@@ -307,13 +309,13 @@ const AdminPanel = () => {
                         </TableCell>
                         <TableCell>
                           <Badge variant={getRoleBadgeVariant(user.role)}>
-                            {user.role || "No role"}
+                            {user.role || t("adminPanel.noRole")}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-muted-foreground">
                           {user.created_at
                             ? new Date(user.created_at).toLocaleDateString()
-                            : "Unknown"}
+                            : t("adminPanel.unknown")}
                         </TableCell>
                         <TableCell className="text-right">
                           <Select
@@ -327,11 +329,11 @@ const AdminPanel = () => {
                             disabled={updateRoleMutation.isPending}
                           >
                             <SelectTrigger className="w-32">
-                              <SelectValue placeholder="Select role" />
+                              <SelectValue placeholder={t("adminPanel.selectRole")} />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="admin">Admin</SelectItem>
-                              <SelectItem value="recruiter">Recruiter</SelectItem>
+                              <SelectItem value="admin">{t("adminPanel.admin")}</SelectItem>
+                              <SelectItem value="recruiter">{t("adminPanel.recruiter")}</SelectItem>
                             </SelectContent>
                           </Select>
                         </TableCell>
@@ -340,7 +342,7 @@ const AdminPanel = () => {
                     {filteredUsers?.length === 0 && (
                       <TableRow>
                         <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                          No users found
+                          {t("adminPanel.noUsersFound")}
                         </TableCell>
                       </TableRow>
                     )}

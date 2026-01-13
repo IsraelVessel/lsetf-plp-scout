@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -47,6 +48,8 @@ const getActionBadgeVariant = (actionType: string): "default" | "secondary" | "d
 };
 
 const ActivityLogSection = () => {
+  const { t } = useTranslation();
+  
   const { data: activities, isLoading } = useQuery({
     queryKey: ['activity-log'],
     queryFn: async () => {
@@ -65,15 +68,22 @@ const ActivityLogSection = () => {
     },
   });
 
+  const getActionLabel = (actionType: string) => {
+    const key = `activityLog.${actionType}`;
+    const translation = t(key);
+    // If translation key doesn't exist, fallback to formatted action type
+    return translation !== key ? translation : actionType.replace('_', ' ');
+  };
+
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <History className="h-5 w-5" />
-          Recent Activity
+          {t("activityLog.title")}
         </CardTitle>
         <CardDescription>
-          Your recent actions in the system
+          {t("activityLog.description")}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -95,7 +105,7 @@ const ActivityLogSection = () => {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <Badge variant={getActionBadgeVariant(activity.action_type)}>
-                        {activity.action_type.replace('_', ' ')}
+                        {getActionLabel(activity.action_type)}
                       </Badge>
                       <span className="text-xs text-muted-foreground">
                         {formatDistanceToNow(new Date(activity.created_at), { addSuffix: true })}
@@ -112,7 +122,7 @@ const ActivityLogSection = () => {
         ) : (
           <div className="text-center py-8 text-muted-foreground">
             <History className="h-12 w-12 mx-auto mb-2 opacity-50" />
-            <p>No activity recorded yet</p>
+            <p>{t("activityLog.noActivity")}</p>
           </div>
         )}
       </CardContent>

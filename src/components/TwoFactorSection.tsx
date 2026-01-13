@@ -1,9 +1,8 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +12,7 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp
 type MFAStatus = "loading" | "unenrolled" | "enrolling" | "enrolled" | "verifying";
 
 const TwoFactorSection = () => {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const [status, setStatus] = useState<MFAStatus>("loading");
   const [qrCode, setQrCode] = useState<string | null>(null);
@@ -63,7 +63,7 @@ const TwoFactorSection = () => {
     } catch (err: any) {
       setError(err.message);
       toast({
-        title: "Error",
+        title: t("common.error"),
         description: err.message,
         variant: "destructive",
       });
@@ -108,13 +108,13 @@ const TwoFactorSection = () => {
       }
 
       toast({
-        title: "2FA Enabled",
-        description: "Two-factor authentication has been successfully enabled.",
+        title: t("twoFactor.enableSuccessTitle"),
+        description: t("twoFactor.enableSuccess"),
       });
     } catch (err: any) {
       setError(err.message);
       toast({
-        title: "Verification Failed",
+        title: t("twoFactor.verificationFailed"),
         description: err.message,
         variant: "destructive",
       });
@@ -145,13 +145,13 @@ const TwoFactorSection = () => {
       setStatus("unenrolled");
       setFactorId(null);
       toast({
-        title: "2FA Disabled",
-        description: "Two-factor authentication has been disabled.",
+        title: t("twoFactor.disableSuccessTitle"),
+        description: t("twoFactor.disableSuccess"),
       });
     } catch (err: any) {
       setError(err.message);
       toast({
-        title: "Error",
+        title: t("common.error"),
         description: err.message,
         variant: "destructive",
       });
@@ -192,17 +192,17 @@ const TwoFactorSection = () => {
         <CardTitle className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Shield className="h-5 w-5" />
-            Two-Factor Authentication
+            {t("twoFactor.title")}
           </div>
           {status === "enrolled" && (
             <Badge variant="default" className="bg-green-600">
               <ShieldCheck className="h-3 w-3 mr-1" />
-              Enabled
+              {t("twoFactor.enabled")}
             </Badge>
           )}
         </CardTitle>
         <CardDescription>
-          Add an extra layer of security to your account using an authenticator app
+          {t("twoFactor.description")}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -216,19 +216,18 @@ const TwoFactorSection = () => {
         {status === "unenrolled" && (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Protect your account by requiring a verification code from your authenticator app 
-              in addition to your password when signing in.
+              {t("twoFactor.protectAccount")}
             </p>
             <Button onClick={startEnrollment} disabled={isLoading}>
               {isLoading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Setting up...
+                  {t("twoFactor.settingUp")}
                 </>
               ) : (
                 <>
                   <Shield className="h-4 w-4 mr-2" />
-                  Enable 2FA
+                  {t("twoFactor.enable")}
                 </>
               )}
             </Button>
@@ -239,9 +238,9 @@ const TwoFactorSection = () => {
           <div className="space-y-6">
             <div className="space-y-4">
               <div className="text-sm">
-                <p className="font-medium mb-2">Step 1: Scan QR Code</p>
+                <p className="font-medium mb-2">{t("twoFactor.step1Title")}</p>
                 <p className="text-muted-foreground">
-                  Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.)
+                  {t("twoFactor.step1Desc")}
                 </p>
               </div>
               
@@ -254,7 +253,7 @@ const TwoFactorSection = () => {
               {secret && (
                 <div className="space-y-2">
                   <p className="text-sm text-muted-foreground">
-                    Or manually enter this secret key:
+                    {t("twoFactor.manualEntry")}
                   </p>
                   <div className="flex items-center gap-2">
                     <code className="flex-1 p-2 bg-muted rounded text-sm font-mono break-all">
@@ -274,9 +273,9 @@ const TwoFactorSection = () => {
 
             <div className="space-y-4">
               <div className="text-sm">
-                <p className="font-medium mb-2">Step 2: Enter Verification Code</p>
+                <p className="font-medium mb-2">{t("twoFactor.step2Title")}</p>
                 <p className="text-muted-foreground">
-                  Enter the 6-digit code from your authenticator app to verify setup
+                  {t("twoFactor.step2Desc")}
                 </p>
               </div>
               
@@ -304,7 +303,7 @@ const TwoFactorSection = () => {
                 onClick={cancelEnrollment}
                 disabled={isLoading}
               >
-                Cancel
+                {t("twoFactor.cancel")}
               </Button>
               <Button 
                 onClick={verifyEnrollment}
@@ -314,12 +313,12 @@ const TwoFactorSection = () => {
                 {isLoading ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Verifying...
+                    {t("twoFactor.verifying")}
                   </>
                 ) : (
                   <>
                     <CheckCircle className="h-4 w-4 mr-2" />
-                    Verify & Enable
+                    {t("twoFactor.verifyEnable")}
                   </>
                 )}
               </Button>
@@ -332,8 +331,7 @@ const TwoFactorSection = () => {
             <Alert>
               <CheckCircle className="h-4 w-4 text-green-600" />
               <AlertDescription>
-                Two-factor authentication is enabled. You'll need to enter a verification code 
-                from your authenticator app when signing in.
+                {t("twoFactor.enabledDesc")}
               </AlertDescription>
             </Alert>
             <Button 
@@ -344,10 +342,10 @@ const TwoFactorSection = () => {
               {isLoading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Disabling...
+                  {t("twoFactor.disabling")}
                 </>
               ) : (
-                "Disable 2FA"
+                t("twoFactor.disable")
               )}
             </Button>
           </div>
