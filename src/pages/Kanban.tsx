@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import Header from "@/components/Header";
@@ -6,9 +7,10 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Mail, Phone, Briefcase, Loader2, FileDown, FileText, ExternalLink } from "lucide-react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Mail, Phone, Briefcase, Loader2, FileDown, FileText, ExternalLink, GripVertical, Eye } from "lucide-react";
 import { exportCandidateToPDF } from "@/utils/pdfExport";
+import { CandidateDetailModal } from "@/components/CandidateDetailModal";
+import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 
 const statusColumns = [
   { id: "pending", label: "Pending", color: "bg-slate-500" },
@@ -20,11 +22,11 @@ const statusColumns = [
   { id: "rejected", label: "Rejected", color: "bg-red-500" },
 ];
 
-const allStatuses = statusColumns.map(s => s.id);
-
 const Kanban = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [selectedApplication, setSelectedApplication] = useState<any>(null);
+  const [modalOpen, setModalOpen] = useState(false);
 
   const { data: applications, isLoading } = useQuery({
     queryKey: ['kanbanApplications'],
@@ -73,7 +75,7 @@ const Kanban = () => {
       queryClient.invalidateQueries({ queryKey: ['kanbanApplications'] });
       toast({
         title: "Status Updated",
-        description: "Candidate status updated successfully",
+        description: "Candidate moved successfully",
       });
     },
     onError: (error) => {
@@ -88,6 +90,28 @@ const Kanban = () => {
 
   const getApplicationsByStatus = (status: string) => {
     return applications?.filter(app => app.status === status) || [];
+  };
+
+  const handleDragEnd = (result: DropResult) => {
+    if (!result.destination) return;
+
+    const sourceStatus = result.source.droppableId;
+    const destinationStatus = result.destination.droppableId;
+
+    if (sourceStatus === destinationStatus) return;
+
+    const applicationId = result.draggableId;
+    
+    updateStatusMutation.mutate({
+      applicationId,
+      newStatus: destinationStatus,
+      oldStatus: sourceStatus,
+    });
+  };
+
+  const handleOpenModal = (application: any) => {
+    setSelectedApplication(application);
+    setModalOpen(true);
   };
 
   if (isLoading) {
@@ -107,63 +131,92 @@ const Kanban = () => {
       <div className="container py-8">
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-foreground mb-2">Kanban Board</h1>
-          <p className="text-muted-foreground">Organize candidates by status columns</p>
+          <p className="text-muted-foreground">Drag and drop candidates between columns to update their status</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
-          {statusColumns.map((column) => {
-            const columnApps = getApplicationsByStatus(column.id);
-            return (
-              <div key={column.id} className="flex flex-col">
-                <div className={`${column.color} text-white rounded-t-lg p-3 mb-2 shadow-md`}>
-                  <h3 className="font-semibold text-sm">{column.label}</h3>
-                  <p className="text-xs opacity-90">{columnApps.length} candidate{columnApps.length !== 1 ? 's' : ''}</p>
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
+            {statusColumns.map((column) => {
+              const columnApps = getApplicationsByStatus(column.id);
+              return (
+                <div key={column.id} className="flex flex-col">
+                  <div className={`${column.color} text-white rounded-t-lg p-3 mb-2 shadow-md`}>
+                    <h3 className="font-semibold text-sm">{column.label}</h3>
+                    <p className="text-xs opacity-90">{columnApps.length} candidate{columnApps.length !== 1 ? 's' : ''}</p>
+                  </div>
+                  <Droppable droppableId={column.id}>
+                    {(provided, snapshot) => (
+                      <div
+                        ref={provided.innerRef}
+                        {...provided.droppableProps}
+                        className={`space-y-3 flex-1 min-h-[400px] rounded-b-lg p-2 transition-colors ${
+                          snapshot.isDraggingOver ? 'bg-primary/10 ring-2 ring-primary/30' : 'bg-muted/20'
+                        }`}
+                      >
+                        {columnApps.map((app: any, index: number) => (
+                          <Draggable key={app.id} draggableId={app.id} index={index}>
+                            {(provided, snapshot) => (
+                              <div
+                                ref={provided.innerRef}
+                                {...provided.draggableProps}
+                                className={snapshot.isDragging ? 'opacity-90' : ''}
+                              >
+                                <CandidateCard
+                                  application={app}
+                                  dragHandleProps={provided.dragHandleProps}
+                                  onViewDetails={() => handleOpenModal(app)}
+                                />
+                              </div>
+                            )}
+                          </Draggable>
+                        ))}
+                        {provided.placeholder}
+                      </div>
+                    )}
+                  </Droppable>
                 </div>
-                <div className="space-y-3 flex-1 min-h-[400px] bg-muted/20 rounded-b-lg p-2">
-                  {columnApps.map((app: any) => (
-                    <CandidateCard
-                      key={app.id}
-                      application={app}
-                      isUpdating={updateStatusMutation.isPending}
-                      onStatusChange={(newStatus) => {
-                        updateStatusMutation.mutate({
-                          applicationId: app.id,
-                          newStatus,
-                          oldStatus: app.status || 'pending',
-                        });
-                      }}
-                    />
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        </DragDropContext>
       </div>
+
+      <CandidateDetailModal
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        application={selectedApplication}
+      />
     </div>
   );
 };
 
 interface CandidateCardProps {
   application: any;
-  isUpdating: boolean;
-  onStatusChange: (newStatus: string) => void;
+  dragHandleProps: any;
+  onViewDetails: () => void;
 }
 
-const CandidateCard = ({ application, isUpdating, onStatusChange }: CandidateCardProps) => {
+const CandidateCard = ({ application, dragHandleProps, onViewDetails }: CandidateCardProps) => {
   const candidate = application.candidates;
   const analysis = application.ai_analysis?.[0];
 
-  const handleViewResume = () => {
+  const handleViewResume = (e: React.MouseEvent) => {
+    e.stopPropagation();
     if (application.resume_url) {
       window.open(application.resume_url, '_blank');
     }
   };
 
   return (
-    <Card className="hover:shadow-lg transition-shadow">
+    <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
       <CardHeader className="p-3 pb-2">
         <div className="flex items-start gap-2">
+          <div
+            {...dragHandleProps}
+            className="cursor-grab active:cursor-grabbing p-1 -ml-1 opacity-50 group-hover:opacity-100 transition-opacity"
+          >
+            <GripVertical className="w-4 h-4 text-muted-foreground" />
+          </div>
           <Avatar className="w-8 h-8">
             <AvatarFallback className="bg-primary text-primary-foreground text-xs">
               {candidate?.name?.charAt(0) || '?'}
@@ -206,49 +259,46 @@ const CandidateCard = ({ application, isUpdating, onStatusChange }: CandidateCar
           )}
         </div>
         
-        {/* Resume/CV View Button */}
-        {application.resume_url && (
+        <div className="pt-2 grid grid-cols-2 gap-1">
           <Button
             size="sm"
-            variant="secondary"
-            className="w-full h-7 text-xs gap-1"
-            onClick={handleViewResume}
+            variant="default"
+            className="h-7 text-xs gap-1"
+            onClick={(e) => {
+              e.stopPropagation();
+              onViewDetails();
+            }}
           >
-            <FileText className="h-3 w-3" />
-            View CV
-            <ExternalLink className="h-3 w-3" />
+            <Eye className="h-3 w-3" />
+            Details
           </Button>
-        )}
-        
-        <div className="pt-2 space-y-2">
-          <Select 
-            value={application.status || 'pending'} 
-            onValueChange={onStatusChange}
-            disabled={isUpdating}
-          >
-            <SelectTrigger className="h-8 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="analyzed">Analyzed</SelectItem>
-              <SelectItem value="reviewed">Reviewed</SelectItem>
-              <SelectItem value="interview">Interview</SelectItem>
-              <SelectItem value="offer">Offer</SelectItem>
-              <SelectItem value="hired">Hired</SelectItem>
-              <SelectItem value="rejected">Rejected</SelectItem>
-            </SelectContent>
-          </Select>
           
-          <Button
-            size="sm"
-            variant="outline"
-            className="w-full h-7 text-xs gap-1"
-            onClick={() => exportCandidateToPDF(application)}
-          >
-            <FileDown className="h-3 w-3" />
-            Export PDF
-          </Button>
+          {application.resume_url && (
+            <Button
+              size="sm"
+              variant="secondary"
+              className="h-7 text-xs gap-1"
+              onClick={handleViewResume}
+            >
+              <FileText className="h-3 w-3" />
+              CV
+            </Button>
+          )}
+          
+          {!application.resume_url && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs gap-1"
+              onClick={(e) => {
+                e.stopPropagation();
+                exportCandidateToPDF(application);
+              }}
+            >
+              <FileDown className="h-3 w-3" />
+              PDF
+            </Button>
+          )}
         </div>
       </CardContent>
     </Card>
