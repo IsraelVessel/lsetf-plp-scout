@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import Header from "@/components/Header";
@@ -7,18 +6,21 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Mail, Phone, Briefcase, Loader2, FileDown } from "lucide-react";
+import { Mail, Phone, Briefcase, Loader2, FileDown, FileText, ExternalLink } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { exportCandidateToPDF } from "@/utils/pdfExport";
 
 const statusColumns = [
-  { id: "new", label: "New", color: "bg-blue-500" },
+  { id: "pending", label: "Pending", color: "bg-slate-500" },
+  { id: "analyzed", label: "Analyzed", color: "bg-blue-500" },
   { id: "reviewed", label: "Reviewed", color: "bg-purple-500" },
   { id: "interview", label: "Interview", color: "bg-yellow-500" },
   { id: "offer", label: "Offer", color: "bg-green-500" },
   { id: "hired", label: "Hired", color: "bg-emerald-500" },
   { id: "rejected", label: "Rejected", color: "bg-red-500" },
 ];
+
+const allStatuses = statusColumns.map(s => s.id);
 
 const Kanban = () => {
   const { toast } = useToast();
@@ -46,7 +48,7 @@ const Kanban = () => {
     mutationFn: async ({ applicationId, newStatus, oldStatus }: { applicationId: string; newStatus: string; oldStatus: string }) => {
       const { error } = await supabase
         .from('applications')
-        .update({ status: newStatus })
+        .update({ status: newStatus, updated_at: new Date().toISOString() })
         .eq('id', applicationId);
       
       if (error) throw error;
@@ -74,10 +76,11 @@ const Kanban = () => {
         description: "Candidate status updated successfully",
       });
     },
-    onError: () => {
+    onError: (error) => {
+      console.error("Status update error:", error);
       toast({
         title: "Error",
-        description: "Failed to update status",
+        description: "Failed to update status. Please try again.",
         variant: "destructive",
       });
     }
@@ -107,7 +110,7 @@ const Kanban = () => {
           <p className="text-muted-foreground">Organize candidates by status columns</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
           {statusColumns.map((column) => {
             const columnApps = getApplicationsByStatus(column.id);
             return (
@@ -121,11 +124,12 @@ const Kanban = () => {
                     <CandidateCard
                       key={app.id}
                       application={app}
+                      isUpdating={updateStatusMutation.isPending}
                       onStatusChange={(newStatus) => {
                         updateStatusMutation.mutate({
                           applicationId: app.id,
                           newStatus,
-                          oldStatus: app.status,
+                          oldStatus: app.status || 'pending',
                         });
                       }}
                     />
@@ -140,9 +144,21 @@ const Kanban = () => {
   );
 };
 
-const CandidateCard = ({ application, onStatusChange }: any) => {
+interface CandidateCardProps {
+  application: any;
+  isUpdating: boolean;
+  onStatusChange: (newStatus: string) => void;
+}
+
+const CandidateCard = ({ application, isUpdating, onStatusChange }: CandidateCardProps) => {
   const candidate = application.candidates;
   const analysis = application.ai_analysis?.[0];
+
+  const handleViewResume = () => {
+    if (application.resume_url) {
+      window.open(application.resume_url, '_blank');
+    }
+  };
 
   return (
     <Card className="hover:shadow-lg transition-shadow">
@@ -190,13 +206,32 @@ const CandidateCard = ({ application, onStatusChange }: any) => {
           )}
         </div>
         
+        {/* Resume/CV View Button */}
+        {application.resume_url && (
+          <Button
+            size="sm"
+            variant="secondary"
+            className="w-full h-7 text-xs gap-1"
+            onClick={handleViewResume}
+          >
+            <FileText className="h-3 w-3" />
+            View CV
+            <ExternalLink className="h-3 w-3" />
+          </Button>
+        )}
+        
         <div className="pt-2 space-y-2">
-          <Select value={application.status} onValueChange={onStatusChange}>
+          <Select 
+            value={application.status || 'pending'} 
+            onValueChange={onStatusChange}
+            disabled={isUpdating}
+          >
             <SelectTrigger className="h-8 text-xs">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="new">New</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="analyzed">Analyzed</SelectItem>
               <SelectItem value="reviewed">Reviewed</SelectItem>
               <SelectItem value="interview">Interview</SelectItem>
               <SelectItem value="offer">Offer</SelectItem>
