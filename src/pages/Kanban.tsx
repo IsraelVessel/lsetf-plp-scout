@@ -128,55 +128,58 @@ const Kanban = () => {
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <div className="container py-8">
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-foreground mb-2">Kanban Board</h1>
-          <p className="text-muted-foreground">Drag and drop candidates between columns to update their status</p>
+      <div className="container py-4 sm:py-8 px-2 sm:px-4">
+        <div className="mb-4 sm:mb-8">
+          <h1 className="text-2xl sm:text-4xl font-bold text-foreground mb-1 sm:mb-2">Kanban Board</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">Drag and drop candidates between columns to update their status</p>
         </div>
 
         <DragDropContext onDragEnd={handleDragEnd}>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
-            {statusColumns.map((column) => {
-              const columnApps = getApplicationsByStatus(column.id);
-              return (
-                <div key={column.id} className="flex flex-col">
-                  <div className={`${column.color} text-white rounded-t-lg p-3 mb-2 shadow-md`}>
-                    <h3 className="font-semibold text-sm">{column.label}</h3>
-                    <p className="text-xs opacity-90">{columnApps.length} candidate{columnApps.length !== 1 ? 's' : ''}</p>
+          {/* Mobile: Horizontal scroll view */}
+          <div className="overflow-x-auto pb-4 -mx-2 px-2 sm:mx-0 sm:px-0">
+            <div className="flex gap-3 sm:grid sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 sm:gap-4 min-w-max sm:min-w-0">
+              {statusColumns.map((column) => {
+                const columnApps = getApplicationsByStatus(column.id);
+                return (
+                  <div key={column.id} className="flex flex-col w-[280px] sm:w-auto flex-shrink-0 sm:flex-shrink">
+                    <div className={`${column.color} text-white rounded-t-lg p-2 sm:p-3 mb-2 shadow-md`}>
+                      <h3 className="font-semibold text-xs sm:text-sm">{column.label}</h3>
+                      <p className="text-xs opacity-90">{columnApps.length} candidate{columnApps.length !== 1 ? 's' : ''}</p>
+                    </div>
+                    <Droppable droppableId={column.id}>
+                      {(provided, snapshot) => (
+                        <div
+                          ref={provided.innerRef}
+                          {...provided.droppableProps}
+                          className={`space-y-2 sm:space-y-3 flex-1 min-h-[300px] sm:min-h-[400px] rounded-b-lg p-2 transition-colors ${
+                            snapshot.isDraggingOver ? 'bg-primary/10 ring-2 ring-primary/30' : 'bg-muted/20'
+                          }`}
+                        >
+                          {columnApps.map((app: any, index: number) => (
+                            <Draggable key={app.id} draggableId={app.id} index={index}>
+                              {(provided, snapshot) => (
+                                <div
+                                  ref={provided.innerRef}
+                                  {...provided.draggableProps}
+                                  className={snapshot.isDragging ? 'opacity-90' : ''}
+                                >
+                                  <CandidateCard
+                                    application={app}
+                                    dragHandleProps={provided.dragHandleProps}
+                                    onViewDetails={() => handleOpenModal(app)}
+                                  />
+                                </div>
+                              )}
+                            </Draggable>
+                          ))}
+                          {provided.placeholder}
+                        </div>
+                      )}
+                    </Droppable>
                   </div>
-                  <Droppable droppableId={column.id}>
-                    {(provided, snapshot) => (
-                      <div
-                        ref={provided.innerRef}
-                        {...provided.droppableProps}
-                        className={`space-y-3 flex-1 min-h-[400px] rounded-b-lg p-2 transition-colors ${
-                          snapshot.isDraggingOver ? 'bg-primary/10 ring-2 ring-primary/30' : 'bg-muted/20'
-                        }`}
-                      >
-                        {columnApps.map((app: any, index: number) => (
-                          <Draggable key={app.id} draggableId={app.id} index={index}>
-                            {(provided, snapshot) => (
-                              <div
-                                ref={provided.innerRef}
-                                {...provided.draggableProps}
-                                className={snapshot.isDragging ? 'opacity-90' : ''}
-                              >
-                                <CandidateCard
-                                  application={app}
-                                  dragHandleProps={provided.dragHandleProps}
-                                  onViewDetails={() => handleOpenModal(app)}
-                                />
-                              </div>
-                            )}
-                          </Draggable>
-                        ))}
-                        {provided.placeholder}
-                      </div>
-                    )}
-                  </Droppable>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         </DragDropContext>
       </div>
