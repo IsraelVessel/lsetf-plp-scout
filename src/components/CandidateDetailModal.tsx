@@ -6,7 +6,11 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CommentsSection } from "@/components/CommentsSection";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient, useMutation } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 import { 
   FileText, 
   Mail, 
@@ -19,8 +23,19 @@ import {
   User,
   Brain,
   MessageCircle,
-  Sparkles
+  Sparkles,
+  Loader2
 } from "lucide-react";
+
+const statusOptions = [
+  { id: "pending", label: "Pending", color: "bg-slate-500" },
+  { id: "analyzed", label: "Analyzed", color: "bg-blue-500" },
+  { id: "reviewed", label: "Reviewed", color: "bg-purple-500" },
+  { id: "interview", label: "Interview", color: "bg-yellow-500" },
+  { id: "offer", label: "Offer", color: "bg-green-500" },
+  { id: "hired", label: "Hired", color: "bg-emerald-500" },
+  { id: "rejected", label: "Rejected", color: "bg-red-500" },
+];
 
 interface CandidateDetailModalProps {
   open: boolean;
@@ -29,11 +44,61 @@ interface CandidateDetailModalProps {
 }
 
 export const CandidateDetailModal = ({ open, onOpenChange, application }: CandidateDetailModalProps) => {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ applicationId, newStatus, oldStatus }: { applicationId: string; newStatus: string; oldStatus: string }) => {
+      const { error } = await supabase
+        .from('applications')
+        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .eq('id', applicationId);
+      
+      if (error) throw error;
+
+      // Trigger notification for key stages
+      const keyStages = ["interview", "offer", "hired"];
+      if (keyStages.includes(newStatus)) {
+        try {
+          await supabase.functions.invoke('notify-status-change', {
+            body: { applicationId, oldStatus, newStatus }
+          });
+        } catch (notifError) {
+          console.error("Failed to send notification:", notifError);
+        }
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['kanbanApplications'] });
+      queryClient.invalidateQueries({ queryKey: ['applications'] });
+      toast({
+        title: "Status Updated",
+        description: "Candidate status changed successfully",
+      });
+    },
+    onError: (error) => {
+      console.error("Status update error:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update status. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
   if (!application) return null;
 
   const candidate = application.candidates;
   const analysis = application.ai_analysis?.[0];
   const skills = application.skills || [];
+
+  const handleStatusChange = (newStatus: string) => {
+    updateStatusMutation.mutate({
+      applicationId: application.id,
+      newStatus,
+      oldStatus: application.status,
+    });
+  };
 
   const getScoreColor = (score: number) => {
     if (score >= 80) return "text-green-600";
@@ -49,43 +114,73 @@ export const CandidateDetailModal = ({ open, onOpenChange, application }: Candid
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-4xl max-h-[90vh] w-[95vw] sm:w-full overflow-hidden flex flex-col">
         <DialogHeader className="flex-shrink-0">
-          <DialogTitle className="flex items-center gap-3">
-            <Avatar className="h-10 w-10">
-              <AvatarFallback className="bg-primary text-primary-foreground">
-                {candidate?.name?.charAt(0) || '?'}
-              </AvatarFallback>
-            </Avatar>
-            <div>
-              <h2 className="text-xl font-bold">{candidate?.name || 'Unknown Candidate'}</h2>
-              {application.job_role && (
-                <p className="text-sm text-muted-foreground flex items-center gap-1">
-                  <Briefcase className="h-3 w-3" />
-                  {application.job_role}
-                </p>
-              )}
+          <DialogTitle className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <div className="flex items-center gap-3">
+              <Avatar className="h-10 w-10">
+                <AvatarFallback className="bg-primary text-primary-foreground">
+                  {candidate?.name?.charAt(0) || '?'}
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <h2 className="text-lg sm:text-xl font-bold">{candidate?.name || 'Unknown Candidate'}</h2>
+                {application.job_role && (
+                  <p className="text-sm text-muted-foreground flex items-center gap-1">
+                    <Briefcase className="h-3 w-3" />
+                    {application.job_role}
+                  </p>
+                )}
+              </div>
+            </div>
+            
+            {/* Status Selector */}
+            <div className="flex items-center gap-2 sm:ml-auto mt-2 sm:mt-0">
+              <span className="text-sm text-muted-foreground">Status:</span>
+              <Select 
+                value={application.status} 
+                onValueChange={handleStatusChange}
+                disabled={updateStatusMutation.isPending}
+              >
+                <SelectTrigger className="w-[140px] h-8">
+                  {updateStatusMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <SelectValue />
+                  )}
+                </SelectTrigger>
+                <SelectContent>
+                  {statusOptions.map((status) => (
+                    <SelectItem key={status.id} value={status.id}>
+                      <div className="flex items-center gap-2">
+                        <div className={`w-2 h-2 rounded-full ${status.color}`} />
+                        {status.label}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </DialogTitle>
         </DialogHeader>
 
         <Tabs defaultValue="overview" className="flex-1 overflow-hidden flex flex-col">
           <TabsList className="grid w-full grid-cols-4 flex-shrink-0">
-            <TabsTrigger value="overview" className="gap-1">
-              <User className="h-4 w-4" />
-              Overview
+            <TabsTrigger value="overview" className="gap-1 text-xs sm:text-sm">
+              <User className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline">Overview</span>
             </TabsTrigger>
-            <TabsTrigger value="resume" className="gap-1">
-              <FileText className="h-4 w-4" />
-              Resume
+            <TabsTrigger value="resume" className="gap-1 text-xs sm:text-sm">
+              <FileText className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline">Resume</span>
             </TabsTrigger>
-            <TabsTrigger value="analysis" className="gap-1">
-              <Brain className="h-4 w-4" />
-              AI Analysis
+            <TabsTrigger value="analysis" className="gap-1 text-xs sm:text-sm">
+              <Brain className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline">Analysis</span>
             </TabsTrigger>
-            <TabsTrigger value="comments" className="gap-1">
-              <MessageCircle className="h-4 w-4" />
-              Comments
+            <TabsTrigger value="comments" className="gap-1 text-xs sm:text-sm">
+              <MessageCircle className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline">Comments</span>
             </TabsTrigger>
           </TabsList>
 
