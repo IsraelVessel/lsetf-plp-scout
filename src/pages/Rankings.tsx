@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import Header from "@/components/Header";
@@ -29,10 +29,18 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { CandidateComparison } from "@/components/CandidateComparison";
-import { InterviewQuestions } from "@/components/InterviewQuestions";
-import { CommentsSection } from "@/components/CommentsSection";
 import { exportCandidateToPDF, exportMultipleCandidatesToPDF } from "@/utils/pdfExport";
+
+// Lazy load heavy components
+const CandidateComparison = lazy(() => 
+  import("@/components/CandidateComparison").then(m => ({ default: m.CandidateComparison }))
+);
+const InterviewQuestions = lazy(() => 
+  import("@/components/InterviewQuestions").then(m => ({ default: m.InterviewQuestions }))
+);
+const CommentsSection = lazy(() => 
+  import("@/components/CommentsSection").then(m => ({ default: m.CommentsSection }))
+);
 
 const Rankings = () => {
   const { toast } = useToast();
@@ -770,14 +778,16 @@ const Rankings = () => {
           </div>
 
           {compareMode && compareIds.length > 0 && compareData && (
-            <CandidateComparison
-              candidates={compareData}
-              onClose={() => {
-                setCompareMode(false);
-                setCompareIds([]);
-              }}
-              onRemove={(id) => setCompareIds(prev => prev.filter(i => i !== id))}
-            />
+            <Suspense fallback={<div className="flex items-center justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>}>
+              <CandidateComparison
+                candidates={compareData}
+                onClose={() => {
+                  setCompareMode(false);
+                  setCompareIds([]);
+                }}
+                onRemove={(id) => setCompareIds(prev => prev.filter(i => i !== id))}
+              />
+            </Suspense>
           )}
 
           {filteredApplications && filteredApplications.length > 0 && (
@@ -1133,7 +1143,9 @@ const Rankings = () => {
                               {expandedQuestions === app.id ? "Hide" : "Show"} AI Interview Questions
                             </Button>
                             {expandedQuestions === app.id && (
-                              <InterviewQuestions applicationId={app.id} />
+                              <Suspense fallback={<div className="flex items-center justify-center p-4"><Loader2 className="h-4 w-4 animate-spin" /></div>}>
+                                <InterviewQuestions applicationId={app.id} />
+                              </Suspense>
                             )}
                           </div>
 
@@ -1149,7 +1161,9 @@ const Rankings = () => {
                               {expandedComments === app.id ? "Hide" : "Show"} Team Comments
                             </Button>
                             {expandedComments === app.id && (
-                              <CommentsSection applicationId={app.id} />
+                              <Suspense fallback={<div className="flex items-center justify-center p-4"><Loader2 className="h-4 w-4 animate-spin" /></div>}>
+                                <CommentsSection applicationId={app.id} />
+                              </Suspense>
                             )}
                           </div>
                         </div>

@@ -1,24 +1,40 @@
+import { Suspense, lazy } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "@/components/ThemeProvider";
-import Dashboard from "./pages/Dashboard";
-import Upload from "./pages/Upload";
-import BatchUpload from "./pages/BatchUpload";
-import Rankings from "./pages/Rankings";
-import Kanban from "./pages/Kanban";
-import Auth from "./pages/Auth";
-import AdminSetup from "./pages/AdminSetup";
-import AdminDashboard from "./pages/AdminDashboard";
-import JobRequirements from "./pages/JobRequirements";
-import Profile from "./pages/Profile";
-import AdminPanel from "./pages/AdminPanel";
-import NotFound from "./pages/NotFound";
+import { Loader2 } from "lucide-react";
 import ProtectedRoute from "./components/ProtectedRoute";
 
+// Eagerly loaded pages (critical path)
+import Auth from "./pages/Auth";
+import NotFound from "./pages/NotFound";
+
+// Lazy loaded pages (code splitting)
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Upload = lazy(() => import("./pages/Upload"));
+const BatchUpload = lazy(() => import("./pages/BatchUpload"));
+const Rankings = lazy(() => import("./pages/Rankings"));
+const Kanban = lazy(() => import("./pages/Kanban"));
+const AdminSetup = lazy(() => import("./pages/AdminSetup"));
+const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
+const JobRequirements = lazy(() => import("./pages/JobRequirements"));
+const Profile = lazy(() => import("./pages/Profile"));
+const AdminPanel = lazy(() => import("./pages/AdminPanel"));
+
 const queryClient = new QueryClient();
+
+// Loading fallback component
+const PageLoader = () => (
+  <div className="min-h-screen flex items-center justify-center bg-background">
+    <div className="flex flex-col items-center gap-3">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <p className="text-sm text-muted-foreground">Loading...</p>
+    </div>
+  </div>
+);
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -27,21 +43,23 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <Routes>
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/admin-setup" element={<ProtectedRoute><AdminSetup /></ProtectedRoute>} />
-            <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-            <Route path="/upload" element={<ProtectedRoute><Upload /></ProtectedRoute>} />
-            <Route path="/batch-upload" element={<ProtectedRoute><BatchUpload /></ProtectedRoute>} />
-            <Route path="/rankings" element={<ProtectedRoute><Rankings /></ProtectedRoute>} />
-            <Route path="/kanban" element={<ProtectedRoute><Kanban /></ProtectedRoute>} />
-            <Route path="/admin-dashboard" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
-            <Route path="/job-requirements" element={<ProtectedRoute><JobRequirements /></ProtectedRoute>} />
-            <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-            <Route path="/admin-panel" element={<ProtectedRoute><AdminPanel /></ProtectedRoute>} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/admin-setup" element={<ProtectedRoute><AdminSetup /></ProtectedRoute>} />
+              <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+              <Route path="/upload" element={<ProtectedRoute><Upload /></ProtectedRoute>} />
+              <Route path="/batch-upload" element={<ProtectedRoute><BatchUpload /></ProtectedRoute>} />
+              <Route path="/rankings" element={<ProtectedRoute><Rankings /></ProtectedRoute>} />
+              <Route path="/kanban" element={<ProtectedRoute><Kanban /></ProtectedRoute>} />
+              <Route path="/admin-dashboard" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
+              <Route path="/job-requirements" element={<ProtectedRoute><JobRequirements /></ProtectedRoute>} />
+              <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+              <Route path="/admin-panel" element={<ProtectedRoute><AdminPanel /></ProtectedRoute>} />
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Suspense>
         </BrowserRouter>
       </TooltipProvider>
     </ThemeProvider>
