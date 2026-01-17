@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import Header from "@/components/Header";
@@ -7,10 +7,16 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Mail, Phone, Briefcase, Loader2, FileDown, FileText, ExternalLink, GripVertical, Eye } from "lucide-react";
+import { Mail, Phone, Briefcase, Loader2, FileDown, FileText, GripVertical, Eye } from "lucide-react";
 import { exportCandidateToPDF } from "@/utils/pdfExport";
-import { CandidateDetailModal } from "@/components/CandidateDetailModal";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
+
+// Lazy load heavy modal component
+const CandidateDetailModal = lazy(() => 
+  import("@/components/CandidateDetailModal").then(module => ({ 
+    default: module.CandidateDetailModal 
+  }))
+);
 
 const statusColumns = [
   { id: "pending", label: "Pending", color: "bg-slate-500" },
@@ -184,11 +190,13 @@ const Kanban = () => {
         </DragDropContext>
       </div>
 
-      <CandidateDetailModal
-        open={modalOpen}
-        onOpenChange={setModalOpen}
-        application={selectedApplication}
-      />
+      <Suspense fallback={null}>
+        <CandidateDetailModal
+          open={modalOpen}
+          onOpenChange={setModalOpen}
+          application={selectedApplication}
+        />
+      </Suspense>
     </div>
   );
 };
