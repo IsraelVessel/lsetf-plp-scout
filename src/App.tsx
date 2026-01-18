@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { Loader2 } from "lucide-react";
 import ProtectedRoute from "./components/ProtectedRoute";
+import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 
 // Eagerly loaded pages (critical path)
 import Auth from "./pages/Auth";
@@ -42,6 +43,7 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner />
+        <PWAInstallPrompt />
         <BrowserRouter>
           <Suspense fallback={<PageLoader />}>
             <Routes>

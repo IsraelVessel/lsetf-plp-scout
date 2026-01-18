@@ -195,6 +195,10 @@ const Kanban = () => {
           open={modalOpen}
           onOpenChange={setModalOpen}
           application={selectedApplication}
+          onStatusUpdated={() => {
+            // Refresh application data after status change
+            queryClient.invalidateQueries({ queryKey: ['kanbanApplications'] });
+          }}
         />
       </Suspense>
     </div>

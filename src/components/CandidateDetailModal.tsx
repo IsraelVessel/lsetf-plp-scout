@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -41,11 +42,22 @@ interface CandidateDetailModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   application: any;
+  onStatusUpdated?: () => void;
 }
 
-export const CandidateDetailModal = ({ open, onOpenChange, application }: CandidateDetailModalProps) => {
+export const CandidateDetailModal = ({ open, onOpenChange, application, onStatusUpdated }: CandidateDetailModalProps) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  
+  // Track current status locally for immediate UI updates
+  const [currentStatus, setCurrentStatus] = useState(application?.status || 'pending');
+  
+  // Sync local status when application changes
+  useEffect(() => {
+    if (application?.status) {
+      setCurrentStatus(application.status);
+    }
+  }, [application?.status]);
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ applicationId, newStatus, oldStatus }: { applicationId: string; newStatus: string; oldStatus: string }) => {
@@ -68,9 +80,11 @@ export const CandidateDetailModal = ({ open, onOpenChange, application }: Candid
         }
       }
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
+      setCurrentStatus(variables.newStatus);
       queryClient.invalidateQueries({ queryKey: ['kanbanApplications'] });
       queryClient.invalidateQueries({ queryKey: ['applications'] });
+      onStatusUpdated?.();
       toast({
         title: "Status Updated",
         description: "Candidate status changed successfully",
@@ -96,7 +110,7 @@ export const CandidateDetailModal = ({ open, onOpenChange, application }: Candid
     updateStatusMutation.mutate({
       applicationId: application.id,
       newStatus,
-      oldStatus: application.status,
+      oldStatus: currentStatus,
     });
   };
 
@@ -138,7 +152,7 @@ export const CandidateDetailModal = ({ open, onOpenChange, application }: Candid
             <div className="flex items-center gap-2 sm:ml-auto mt-2 sm:mt-0">
               <span className="text-sm text-muted-foreground">Status:</span>
               <Select 
-                value={application.status} 
+                value={currentStatus}
                 onValueChange={handleStatusChange}
                 disabled={updateStatusMutation.isPending}
               >
