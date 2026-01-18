@@ -8,6 +8,7 @@ import escogerLogo from "@/assets/escoger-logo.jpeg";
 import { useQuery } from "@tanstack/react-query";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import { PushNotificationToggle } from "@/components/PushNotificationToggle";
 
 const Header = () => {
   const navigate = useNavigate();
@@ -131,6 +132,7 @@ const Header = () => {
           )}
         </nav>
         <div className="flex items-center gap-2">
+          <PushNotificationToggle />
           <LanguageSwitcher />
           <ThemeToggle />
           <Link to="/profile">
