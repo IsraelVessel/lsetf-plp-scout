@@ -12,6 +12,9 @@ verify_jwt = false
 [functions.match-candidates]
 verify_jwt = false
 
+[functions.notify-status-change]
+verify_jwt = false
+
 [functions.retry-notification]
 verify_jwt = false
 
